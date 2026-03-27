@@ -62,7 +62,7 @@ Fully localized in: English, 简体中文, 日本語, Español, Français, Deuts
 ### From Source (Developer Mode)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/iris-extension.git
+git clone https://github.com/koni20/iris-extension.git
 cd iris-extension
 ```
 
@@ -124,7 +124,7 @@ All data processing happens **entirely on your device**. No analytics, no teleme
 
 Contributions are welcome. Areas where help is most valuable:
 
-- **Tracker database**: Found a tracker domain not in our list? [Open an issue](../../issues/new?template=tracker.md)
+- **Tracker database**: Found a tracker domain not in our list? [Open an issue](https://github.com/koni20/iris-extension/issues/new)
 - **AI services**: New AI provider or API domain? PRs welcome
 - **False positives**: A legit site being flagged incorrectly? Please report it
 - **Translations**: Improving existing or adding new languages
