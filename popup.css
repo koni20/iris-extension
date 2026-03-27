@@ -551,3 +551,13 @@ body {
 .db-dot.live  { background: var(--green); box-shadow: 0 0 4px rgba(5,150,105,0.5); }
 .db-dot.cache { background: var(--amber); }
 .db-dot.local { background: var(--muted); }
+
+.db-link {
+  margin-left: auto;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 10.5px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.db-link:hover { opacity: 1; }

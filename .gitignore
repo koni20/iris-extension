@@ -3,3 +3,4 @@
 *.crx
 node_modules/
 .env
+iris-extension/
