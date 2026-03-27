@@ -94,11 +94,22 @@ body {
   box-shadow: var(--shadow);
 }
 
-.logo { display: flex; align-items: center; gap: 8px; }
+.logo { display: flex; align-items: center; gap: 8px; position: relative; }
+
+.logo-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
 
 .logo-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
+  position: absolute;
+  bottom: -1px;
+  left: 18px;
+  border: 1.5px solid white;
   background: var(--accent);
   box-shadow: 0 0 0 2px rgba(108,94,246,0.2);
   transition: background 0.4s, box-shadow 0.4s;
