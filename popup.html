@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Iris</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- 钓鱼警告 Banner（默认隐藏，检测到仿冒 AI 域名时显示） -->
+    <div class="phishing-banner hidden" id="phishingBanner">
+      <div class="phishing-icon">🚨</div>
+      <div class="phishing-body">
+        <div class="phishing-title" id="phishingTitle"></div>
+        <div class="phishing-sub" id="phishingSub"></div>
+        <div class="phishing-legit" id="phishingLegit"></div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-dot" id="logoDot"></div>
+        <span class="logo-text">Iris</span>
+      </div>
+      <div class="site-badge" id="siteBadge">—</div>
+    </header>
+
+    <!-- Verdict -->
+    <div class="verdict-section" id="verdictSection">
+      <div class="verdict-icon" id="verdictIcon">🔍</div>
+      <div class="verdict-body">
+        <div class="verdict-title" id="verdictTitle">Scanning...</div>
+        <div class="verdict-sub" id="verdictSub">Loading page data</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-num" id="statTrackers">—</div>
+        <div class="stat-label">Trackers</div>
+      </div>
+      <div class="divider-v"></div>
+      <div class="stat">
+        <div class="stat-num" id="statRequests">—</div>
+        <div class="stat-label">Requests</div>
+      </div>
+      <div class="divider-v"></div>
+      <div class="stat">
+        <div class="stat-num" id="statApis">—</div>
+        <div class="stat-label">API Calls</div>
+      </div>
+    </div>
+
+    <!-- Comparison bar -->
+    <div class="comparison-section" id="comparisonSection" style="display:none">
+      <div class="comp-label" id="compLabel"></div>
+      <div class="comp-track">
+        <div class="comp-fill" id="compFill"></div>
+        <div class="comp-marker"></div>
+      </div>
+      <div class="comp-ends">
+        <span>Privacy-friendly</span>
+        <span>Most invasive</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="trackers">Trackers</button>
+      <button class="tab" data-tab="apis">Browser APIs</button>
+      <button class="tab" data-tab="ai">
+        <span class="ai-tab-label">AI Safety</span>
+        <span class="ai-badge hidden" id="aiBadge"></span>
+      </button>
+    </div>
+
+    <!-- Tracker List -->
+    <div class="list-section" id="tabTrackers">
+      <div class="empty-state" id="emptyTrackers">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">No known trackers detected</div>
+        <div class="empty-sub">This page hasn't contacted any domains in our database yet.</div>
+      </div>
+      <div id="trackerList"></div>
+    </div>
+
+    <!-- API Call List -->
+    <div class="list-section hidden" id="tabApis">
+      <div class="empty-state" id="emptyApis">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">No sensitive API calls detected</div>
+        <div class="empty-sub">No fingerprinting, location, or camera access on this page.</div>
+      </div>
+      <div id="apiList"></div>
+    </div>
+
+    <!-- AI Safety List -->
+    <div class="list-section hidden" id="tabAi">
+      <div class="empty-state" id="emptyAi">
+        <div class="empty-icon">🤖</div>
+        <div class="empty-title" id="emptyAiTitle">No AI services detected</div>
+        <div class="empty-sub" id="emptyAiSub">This page doesn't appear to be sending your data to any AI APIs.</div>
+      </div>
+      <div id="aiList"></div>
+    </div>
+
+  </div>
+
+    <!-- 底部数据库状态 -->
+    <div class="db-footer" id="dbFooter">
+      <span class="db-dot" id="dbDot"></span>
+      <span id="dbStatus">Loading database info...</span>
+    </div>
+
+  </div>
+
+  <script src="trackers.js"></script>
+  <script src="i18n.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

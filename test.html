@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>Iris — 功能测试页</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f7; color: #1a1a2e; padding: 32px; }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    .subtitle { color: #666; margin-bottom: 32px; font-size: 14px; }
+    .section { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e4e4ec; }
+    .section h2 { font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .btn {
+      display: inline-block; padding: 8px 16px; border-radius: 8px;
+      background: #6c5ef6; color: #fff; border: none; cursor: pointer;
+      font-size: 13px; margin: 4px 4px 4px 0;
+    }
+    .btn:hover { background: #5a4de0; }
+    .btn.danger { background: #e53e3e; }
+    .btn.amber  { background: #d97706; }
+    .btn.green  { background: #059669; }
+    .log {
+      margin-top: 10px; background: #f0f0f5; border-radius: 8px;
+      padding: 10px 12px; font-family: monospace; font-size: 12px;
+      max-height: 120px; overflow-y: auto; color: #444;
+      border: 1px solid #e4e4ec;
+    }
+    .log .ok   { color: #059669; }
+    .log .warn { color: #d97706; }
+    .log .err  { color: #e53e3e; }
+    .tip { font-size: 12px; color: #888; margin-top: 8px; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>🔬 Iris 功能测试页</h1>
+<p class="subtitle">请在 Chrome 中打开 Iris 插件，点击下面的按钮，观察 Iris popup 中的变化。</p>
+
+<!-- AI API 检测 -->
+<div class="section">
+  <h2>🤖 AI 服务检测</h2>
+  <button class="btn danger" onclick="testAI('https://api.openai.com/v1/models')">模拟调用 OpenAI API</button>
+  <button class="btn danger" onclick="testAI('https://api.anthropic.com/v1/messages')">模拟调用 Anthropic API</button>
+  <button class="btn amber"  onclick="testAI('https://api.deepseek.com/v1/chat/completions')">模拟调用 DeepSeek API</button>
+  <button class="btn amber"  onclick="testAI('https://api.moonshot.cn/v1/chat/completions')">模拟调用 Kimi API</button>
+  <button class="btn amber"  onclick="testAI('https://dashscope.aliyuncs.com/api/v1/services')">模拟调用通义千问 API</button>
+  <button class="btn amber"  onclick="testAI('https://open.bigmodel.cn/api/paas/v4/chat')">模拟调用智谱 GLM API</button>
+  <p class="tip">请求会因 CORS 失败，但 Iris 在发送前就已拦截 ✓</p>
+  <div class="log" id="logAI">等待测试...</div>
+</div>
+
+<!-- WebSocket AI 检测 -->
+<div class="section">
+  <h2>🔌 WebSocket / SSE 检测</h2>
+  <button class="btn amber" onclick="testWS('wss://api.openai.com/v1/realtime')">模拟 WebSocket → OpenAI</button>
+  <button class="btn amber" onclick="testWS('wss://api.deepseek.com/v1/ws')">模拟 WebSocket → DeepSeek</button>
+  <p class="tip">连接会立刻失败，但 URL 会在建立前被拦截 ✓</p>
+  <div class="log" id="logWS">等待测试...</div>
+</div>
+
+<!-- 浏览器指纹检测 -->
+<div class="section">
+  <h2>🕵️ 浏览器指纹检测</h2>
+  <button class="btn" onclick="testCanvas()">Canvas 指纹</button>
+  <button class="btn" onclick="testWebGL()">WebGL 指纹</button>
+  <button class="btn" onclick="testAudio()">Audio 指纹</button>
+  <button class="btn" onclick="testWebRTC()">WebRTC IP 泄露</button>
+  <button class="btn" onclick="testClipboard()">剪贴板读取</button>
+  <p class="tip">这些 API 会被 Iris inject.js 拦截，在 Browser APIs 标签中可见</p>
+  <div class="log" id="logFP">等待测试...</div>
+</div>
+
+<!-- 一键全测 -->
+<div class="section">
+  <h2>⚡ 一键全部测试</h2>
+  <button class="btn green" onclick="runAll()">全部触发</button>
+  <p class="tip">依次触发所有场景，Iris 应该显示追踪器数量 + AI Safety 条目</p>
+</div>
+
+<canvas id="fpCanvas" width="200" height="50"></canvas>
+
+<script>
+function log(id, msg, type = "") {
+  const el = document.getElementById(id);
+  const line = document.createElement("div");
+  line.className = type;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── AI fetch 测试 ──────────────────────────────────────────────────────────────
+function testAI(url) {
+  log("logAI", `正在 fetch: ${url}`, "warn");
+  fetch(url, { method: "GET", mode: "no-cors" })
+    .then(() => log("logAI", `完成（no-cors）: ${url}`, "ok"))
+    .catch(() => log("logAI", `网络失败（正常）: ${url} — Iris 已在发送前拦截`, "ok"));
+}
+
+// ── WebSocket 测试 ─────────────────────────────────────────────────────────────
+function testWS(url) {
+  log("logWS", `正在建立 WebSocket: ${url}`, "warn");
+  try {
+    const ws = new WebSocket(url);
+    ws.onerror = () => log("logWS", `连接失败（正常）: ${url} — Iris 已拦截`, "ok");
+    ws.onopen  = () => { log("logWS", `已连接: ${url}`, "ok"); ws.close(); };
+  } catch(e) {
+    log("logWS", `异常（正常）: ${e.message}`, "ok");
+  }
+}
+
+// ── 指纹测试 ───────────────────────────────────────────────────────────────────
+function testCanvas() {
+  const canvas = document.getElementById("fpCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.fillText("Iris fingerprint test", 10, 30);
+  const data = canvas.toDataURL();
+  log("logFP", `Canvas.toDataURL() 调用 — 数据长度: ${data.length}`, "ok");
+}
+
+function testWebGL() {
+  const canvas = document.createElement("canvas");
+  const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  if (!gl) { log("logFP", "WebGL 不支持", "err"); return; }
+  const vendor   = gl.getParameter(0x1F00); // VENDOR
+  const renderer = gl.getParameter(0x1F01); // RENDERER
+  log("logFP", `WebGL GPU: ${vendor} / ${renderer}`, "ok");
+}
+
+function testAudio() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    log("logFP", `AudioContext.createOscillator() 调用 — sample rate: ${ctx.sampleRate}Hz`, "ok");
+    ctx.close();
+  } catch(e) {
+    log("logFP", `Audio 测试: ${e.message}`, "err");
+  }
+}
+
+function testWebRTC() {
+  try {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    pc.createDataChannel("iris-test");
+    pc.createOffer().then(offer => pc.setLocalDescription(offer));
+    log("logFP", `RTCPeerConnection 已创建 — 正在收集 ICE 候选（可能暴露真实 IP）`, "warn");
+    setTimeout(() => pc.close(), 3000);
+  } catch(e) {
+    log("logFP", `WebRTC: ${e.message}`, "err");
+  }
+}
+
+function testClipboard() {
+  navigator.clipboard.readText()
+    .then(text => log("logFP", `剪贴板内容已读取: "${text.slice(0,20)}..."`, "ok"))
+    .catch(() => log("logFP", `剪贴板读取 — 被浏览器拦截（正常），但 Iris 已记录该请求`, "ok"));
+}
+
+function runAll() {
+  testAI("https://api.openai.com/v1/models");
+  setTimeout(() => testAI("https://api.deepseek.com/v1/chat/completions"), 200);
+  setTimeout(() => testAI("https://api.moonshot.cn/v1/chat/completions"), 400);
+  setTimeout(() => testWS("wss://api.openai.com/v1/realtime"), 600);
+  setTimeout(() => testCanvas(),   800);
+  setTimeout(() => testWebGL(),   1000);
+  setTimeout(() => testAudio(),   1200);
+  setTimeout(() => testWebRTC(),  1400);
+}
+</script>
+</body>
+</html>
