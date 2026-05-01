@@ -13,6 +13,25 @@ document.getElementById("statTrackers").closest(".stat").querySelector(".stat-la
 document.getElementById("statRequests").closest(".stat").querySelector(".stat-label").textContent  = t.requests;
 document.getElementById("statApis").closest(".stat").querySelector(".stat-label").textContent      = t.apiCalls;
 
+document.querySelector(".ai-tab-label").textContent = t.tabAiSafety;
+document.getElementById("tabBtnContent").textContent = t.tabContentSafety;
+document.getElementById("emptyContentTitle").textContent = t.csEmptyTitle;
+document.getElementById("emptyContentSub").textContent = t.csEmptySub;
+
+function initTabs() {
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("tabTrackers").classList.toggle("hidden", tab.dataset.tab !== "trackers");
+      document.getElementById("tabApis").classList.toggle("hidden", tab.dataset.tab !== "apis");
+      document.getElementById("tabAi").classList.toggle("hidden", tab.dataset.tab !== "ai");
+      document.getElementById("tabContent").classList.toggle("hidden", tab.dataset.tab !== "content");
+    });
+  });
+}
+initTabs();
+
 // ── 获取并渲染数据 ─────────────────────────────────────────────────────────────
 function fetchAndRender() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
@@ -39,6 +58,13 @@ function resetToScanning() {
   document.getElementById("logoDot").className        = "logo-dot";
   document.getElementById("siteBadge").textContent    = "—";
   document.getElementById("phishingBanner").classList.add("hidden");
+  document.getElementById("contentSafetyList").innerHTML = "";
+  lastContentSafetyJson = "";
+  const csSummary = document.getElementById("csSummary");
+  if (csSummary) {
+    csSummary.className = "cs-summary cs-rating-green";
+    csSummary.innerHTML = "";
+  }
 }
 
 // ── 监听来自 background 的 Tab 变化通知 ──────────────────────────────────────
@@ -55,16 +81,20 @@ chrome.runtime.onMessage.addListener((message) => {
 // ── 轮询刷新（每 2 秒，让数据实时更新）──────────────────────────────────────
 let lastTrackerCount = -1;
 let lastApiCount = -1;
+let lastContentSafetyJson = "";
 
 function pollData() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
     if (chrome.runtime.lastError || !data) return;
+    const csJson = JSON.stringify(data.contentSafety || {});
     const changed =
       data.trackers.length !== lastTrackerCount ||
-      data.apiCalls.length !== lastApiCount;
+      data.apiCalls.length !== lastApiCount ||
+      csJson !== lastContentSafetyJson;
     if (changed) {
       lastTrackerCount = data.trackers.length;
-      lastApiCount     = data.apiCalls.length;
+      lastApiCount = data.apiCalls.length;
+      lastContentSafetyJson = csJson;
       render(data);
     }
   });
@@ -101,29 +131,122 @@ function renderPhishing(phishing) {
     (t.phishingLegitPrefix || "✅ Official: ") + phishing.legitimateDomains.join(" / ");
 }
 
-function renderDBMeta(dbMeta) {
+function renderDBMeta(dbMeta, csMeta) {
   if (!dbMeta) return;
-  const dot    = document.getElementById("dbDot");
+  const dot = document.getElementById("dbDot");
   const status = document.getElementById("dbStatus");
+  const parts = [];
 
   if (dbMeta.updatedAt) {
     const days = Math.floor((Date.now() - dbMeta.updatedAt) / 86400000);
     const dateStr = new Date(dbMeta.updatedAt).toLocaleDateString();
     const countStr = dbMeta.dynamicCount ? `+${dbMeta.dynamicCount.toLocaleString()} domains` : "";
-    dot.className   = "db-dot cache";
-    status.textContent = `disconnect.me ${countStr} · ${t.dbUpdated ? t.dbUpdated(days) : (days === 0 ? "updated today" : `updated ${days}d ago`)} (${dateStr})`;
+    dot.className = "db-dot cache";
+    parts.push(
+      `disconnect.me ${countStr} · ${t.dbUpdated ? t.dbUpdated(days) : days === 0 ? "updated today" : `updated ${days}d ago`} (${dateStr})`
+    );
   } else {
-    dot.className   = "db-dot local";
-    status.textContent = t.dbBuiltIn || "built-in database · fetching latest…";
+    dot.className = "db-dot local";
+    parts.push(t.dbBuiltIn || "built-in database · fetching latest…");
+  }
+
+  if (csMeta && csMeta.updatedAt) {
+    const csd = Math.floor((Date.now() - csMeta.updatedAt) / 86400000);
+    const n = csMeta.dynamicCount ? `${csMeta.dynamicCount.toLocaleString()} adult domains · ` : "";
+    parts.push(`content ${n}${t.dbUpdated(csd)}`);
+  }
+
+  status.textContent = parts.join(" · ");
+}
+
+function renderContentSafety(cs) {
+  const summary = document.getElementById("csSummary");
+  const list = document.getElementById("contentSafetyList");
+  const empty = document.getElementById("emptyContent");
+  const lang = (navigator.language || "en").toLowerCase().split("-")[0];
+  const useZh = lang === "zh";
+
+  const rating = cs.rating || "green";
+  summary.className = "cs-summary cs-rating-" + rating;
+
+  const titleKey = "csRating_" + rating + "Title";
+  const subKey = "csRating_" + rating + "Sub";
+  summary.innerHTML = `
+    <div class="cs-rating-icon">${rating === "green" ? "🟢" : rating === "yellow" ? "🟡" : "🔴"}</div>
+    <div class="cs-rating-body">
+      <div class="cs-rating-title">${t[titleKey] || ""}</div>
+      <div class="cs-rating-sub">${t[subKey] || ""}</div>
+    </div>
+  `;
+
+  const hasRows =
+    (cs.domainMatches && cs.domainMatches.length > 0) ||
+    (cs.keywords && cs.keywords.length > 0) ||
+    (cs.manipulation && cs.manipulation.length > 0);
+
+  list.innerHTML = "";
+
+  if (!hasRows && rating === "green") {
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+
+  for (const d of cs.domainMatches || []) {
+    const div = document.createElement("div");
+    div.className = "cs-item cs-item-domain";
+    const catLabel = (t.csCategories && t.csCategories[d.category]) || d.category;
+    div.innerHTML = `
+      <div class="cs-item-tag">${catLabel}</div>
+      <div class="cs-item-domain">${d.domain}</div>
+      <div class="cs-item-plain">${useZh ? d.plain_zh : d.plain_en}</div>
+    `;
+    list.appendChild(div);
+  }
+
+  for (const k of cs.keywords || []) {
+    const div = document.createElement("div");
+    div.className = "cs-item cs-item-kw cs-level-" + k.level;
+    const lvlKey = "csLevel_" + k.level;
+    div.innerHTML = `
+      <div class="cs-item-tag">${t[lvlKey] || k.level}</div>
+      <div class="cs-item-plain">${typeof t.csKeywordMatch === "function" ? t.csKeywordMatch(k.match) : k.match}</div>
+    `;
+    list.appendChild(div);
+  }
+
+  for (const m of cs.manipulation || []) {
+    const div = document.createElement("div");
+    div.className = "cs-item cs-item-manip";
+    const hintKey = "csManip_" + m.hint;
+    const msg = t[hintKey] || m.hint;
+    div.innerHTML = `
+      <div class="cs-item-tag">${t.csManipType}</div>
+      <div class="cs-item-plain">${msg}</div>
+    `;
+    list.appendChild(div);
   }
 }
 
-function render({ trackers, totalRequests, apiCalls, aiCalls = [], phishing = null, dbMeta = null, url }) {
+function render({
+  trackers,
+  totalRequests,
+  apiCalls,
+  aiCalls = [],
+  phishing = null,
+  dbMeta = null,
+  csMeta = null,
+  contentSafety = null,
+  url,
+}) {
   // 钓鱼警告（最优先渲染）
   renderPhishing(phishing);
 
   // 数据库状态
-  renderDBMeta(dbMeta);
+  renderDBMeta(dbMeta, csMeta);
+
+  renderContentSafety(contentSafety || { rating: "green", domainMatches: [], keywords: [], manipulation: [] });
 
   // 站点名
   let hostname = "—";
@@ -162,16 +285,6 @@ function render({ trackers, totalRequests, apiCalls, aiCalls = [], phishing = nu
     aiBadge.classList.add("hidden");
   }
 
-  // Tab 切换
-  document.querySelectorAll(".tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-      document.getElementById("tabTrackers").classList.toggle("hidden", tab.dataset.tab !== "trackers");
-      document.getElementById("tabApis").classList.toggle("hidden", tab.dataset.tab !== "apis");
-      document.getElementById("tabAi").classList.toggle("hidden", tab.dataset.tab !== "ai");
-    });
-  });
 }
 
 // ── 风险等级判断 ────────────────────────────────────────────────────────────────
@@ -346,16 +459,19 @@ function renderAiCalls(aiCalls) {
 
   aiCalls.forEach((call, i) => {
     const item = document.createElement("div");
-    item.className = `ai-item risk-${call.risk || "medium"}`;
+    // AI 官网本身用中性蓝色，第三方调用才用风险色
+    const isWebsite = call.source === "website";
+    item.className = `ai-item risk-${isWebsite ? "website" : (call.risk || "medium")}`;
     item.style.animationDelay = `${i * 50}ms`;
 
-    const riskLabel = call.risk === "high"
-      ? (t.highRisk || "High Risk")
-      : (t.mediumRisk || "Medium Risk");
+    // AI 官网本身不显示"高风险"，改为中性标签
+    const riskLabel = isWebsite
+      ? (t.aiServiceLabel || "AI 服务")
+      : (call.risk === "high"
+          ? (t.highRisk || "High Risk")
+          : (t.mediumRisk || "Medium Risk"));
 
     const plainText = call[plainKey] || call.plain_en || "";
-    // source === "website" 表示当前页面本身就是 AI 服务网站
-    const isWebsite = call.source === "website";
     const countText = isWebsite
       ? (t.aiCallWebsite || "You are currently using this AI service")
       : (call.count > 1

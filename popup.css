@@ -250,9 +250,10 @@ body {
 /* ── Tabs ───────────────────────────────────────────────────────────────────── */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
-  padding: 0 16px;
-  gap: 4px;
+  padding: 0 12px;
+  gap: 2px;
   background: var(--s1);
 }
 
@@ -262,9 +263,9 @@ body {
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 10px 12px;
+  padding: 10px 8px;
   cursor: pointer;
   transition: all 0.15s;
   margin-bottom: -1px;
@@ -462,8 +463,9 @@ body {
   box-shadow: var(--shadow);
 }
 
-.ai-item.risk-high   { border-color: #fecaca; border-left-color: var(--red); }
-.ai-item.risk-medium { border-color: #e9d5ff; border-left-color: #7c3aed; }
+.ai-item.risk-high    { border-color: #fecaca; border-left-color: var(--red); }
+.ai-item.risk-medium  { border-color: #e9d5ff; border-left-color: #7c3aed; }
+.ai-item.risk-website { border-color: #bfdbfe; border-left-color: var(--blue); }
 
 .ai-header {
   display: flex;
@@ -536,6 +538,99 @@ body {
 }
 
 .hidden { display: none !important; }
+
+/* ── Content Safety (v1.2) ─────────────────────────────────────────────────── */
+.cs-summary {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  margin: 8px 10px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--s1);
+}
+
+.cs-rating-green {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+
+.cs-rating-yellow {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.cs-rating-red {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.cs-rating-icon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cs-rating-body {
+  min-width: 0;
+}
+
+.cs-rating-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.cs-rating-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.cs-item {
+  margin: 6px 10px;
+  padding: 10px 12px;
+  background: var(--s1);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.cs-item-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.cs-item-domain {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.cs-item-plain {
+  font-size: 11.5px;
+  color: #555570;
+  line-height: 1.5;
+}
+
+.cs-level-severe .cs-item-tag {
+  color: #991b1b;
+}
+
+.cs-level-moderate .cs-item-tag {
+  color: #b45309;
+}
+
+.cs-level-mild .cs-item-tag {
+  color: #6b7280;
+}
 
 /* ── 数据库状态栏 ────────────────────────────────────────────────────────────── */
 .db-footer {

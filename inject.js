@@ -154,7 +154,11 @@
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input?.url || "");
     checkAIUrl(url);
-    return origFetch.apply(this, arguments);
+    const promise = origFetch.apply(this, arguments);
+    // 防止页面未捕获的 fetch 错误被 Chrome 归到 inject.js（扩展报错）
+    // 加空 catch 标记为"已处理"，不影响页面自身的 .catch() 继续运行
+    promise.catch(() => {});
+    return promise;
   };
 
   // 拦截 XMLHttpRequest
@@ -167,7 +171,7 @@
   // 拦截 WebSocket（AI 流式响应常用）
   const OrigWebSocket = window.WebSocket;
   window.WebSocket = function (url, ...args) {
-    checkAIUrl(typeof url === "string" ? url : "");
+    try { checkAIUrl(typeof url === "string" ? url : ""); } catch {}
     return new OrigWebSocket(url, ...args);
   };
   window.WebSocket.prototype = OrigWebSocket.prototype;
@@ -180,7 +184,7 @@
   const OrigEventSource = window.EventSource;
   if (OrigEventSource) {
     window.EventSource = function (url, init) {
-      checkAIUrl(typeof url === "string" ? url : "");
+      try { checkAIUrl(typeof url === "string" ? url : ""); } catch {}
       return new OrigEventSource(url, init);
     };
     window.EventSource.prototype = OrigEventSource.prototype;
@@ -209,5 +213,107 @@
       return origGetBattery();
     };
   }
+
+  // ── 内容安全：可见文本与诱导行为（v1.2，仅本地）──────────────────────────────
+  const CS_ZH_SEVERE = [
+    "色情直播", "裸体视频", "成人影片", "一夜情交友", "同城约炮", "裸聊",
+  ];
+  const CS_ZH_MODERATE = [
+    "网络赌博", "博彩网站", "投注平台", "在线赌场", "棋牌捕鱼", "菠菜平台",
+  ];
+  const CS_ZH_MILD = ["棋牌游戏", "彩票投注", "电竞投注"];
+
+  const CS_EN_SEVERE = [];
+  const CS_EN_MODERATE = [
+    "online casino", "sports betting", "poker room", "slots bonus",
+  ];
+  const CS_EN_MILD = ["gambling site", "bet now"];
+
+  function scanKeywords(text) {
+    const hits = [];
+    const push = (level, phrase) => {
+      if (!hits.some((h) => h.match === phrase && h.level === level)) {
+        hits.push({ level, match: phrase });
+      }
+    };
+
+    for (const phrase of CS_ZH_SEVERE) {
+      if (text.includes(phrase)) push("severe", phrase);
+    }
+    for (const phrase of CS_ZH_MODERATE) {
+      if (text.includes(phrase)) push("moderate", phrase);
+    }
+    for (const phrase of CS_ZH_MILD) {
+      if (text.includes(phrase)) push("mild", phrase);
+    }
+
+    const lower = text.toLowerCase();
+    for (const phrase of CS_EN_SEVERE) {
+      if (lower.includes(phrase)) push("severe", phrase);
+    }
+    for (const phrase of CS_EN_MODERATE) {
+      if (lower.includes(phrase)) push("moderate", phrase);
+    }
+    for (const phrase of CS_EN_MILD) {
+      if (lower.includes(phrase)) push("mild", phrase);
+    }
+
+    return hits;
+  }
+
+  function detectManipulation(text) {
+    const out = [];
+    if (/打赏|送礼物|礼物榜|送火箭|嘉年华/.test(text) && /充值|支付|微信|支付宝|付款|\d+\s*元/.test(text)) {
+      out.push({ type: "live_monetization", hint: "live_tip_payment" });
+    }
+    if (/限时|仅此一天|错过再等|倒计时/.test(text) && /会员|VIP|订阅|解锁|付费观看/.test(text)) {
+      out.push({ type: "urgency_paywall", hint: "urgency_membership" });
+    }
+    return out;
+  }
+
+  function postContentSafetyScan() {
+    try {
+      const root = document.body;
+      if (!root) return;
+      const text = (root.innerText || "").slice(0, 100000);
+      if (text.length < 40) return;
+
+      const keywords = scanKeywords(text);
+      const manipulation = detectManipulation(text);
+      if (keywords.length === 0 && manipulation.length === 0) return;
+
+      window.postMessage(
+        {
+          __uncloak: true,
+          api: "content-safety-scan",
+          detail: JSON.stringify({ keywords, manipulation }),
+        },
+        "*"
+      );
+    } catch (e) {}
+  }
+
+  function scheduleContentSafetyScan() {
+    function run() {
+      if (!document.body) {
+        setTimeout(run, 400);
+        return;
+      }
+      postContentSafetyScan();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(run, 1800);
+        setTimeout(run, 6000);
+      });
+    } else {
+      setTimeout(run, 1800);
+      setTimeout(run, 6000);
+    }
+  }
+
+  scheduleContentSafetyScan();
 
 })();

@@ -78,6 +78,7 @@
         <span class="ai-tab-label">AI Safety</span>
         <span class="ai-badge hidden" id="aiBadge"></span>
       </button>
+      <button class="tab" data-tab="content" id="tabBtnContent">Content</button>
     </div>
 
     <!-- Tracker List -->
@@ -110,7 +111,16 @@
       <div id="aiList"></div>
     </div>
 
-  </div>
+    <!-- Content Safety -->
+    <div class="list-section hidden" id="tabContent">
+      <div class="cs-summary cs-rating-green" id="csSummary"></div>
+      <div class="empty-state hidden" id="emptyContent">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title" id="emptyContentTitle">Nothing flagged</div>
+        <div class="empty-sub" id="emptyContentSub">No risky domains or phrases detected on this page.</div>
+      </div>
+      <div id="contentSafetyList"></div>
+    </div>
 
     <!-- 底部数据库状态 -->
     <div class="db-footer" id="dbFooter">

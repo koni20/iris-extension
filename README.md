@@ -1,5 +1,7 @@
 # Iris — Privacy & AI Safety
 
+[![GitHub stars](https://img.shields.io/github/stars/koni20/iris-extension?style=flat&logo=github)](https://github.com/koni20/iris-extension)
+
 > See what websites really do with your data.
 
 Iris is an open-source Chrome extension that makes browser privacy **observable**, not just blockable. While other tools silently block trackers, Iris explains what's happening — in plain language anyone can understand.
@@ -72,7 +74,10 @@ cd iris-extension
 4. Select the `iris-extension` folder
 
 ### Chrome Web Store
-*(Coming soon)*
+
+**Published** — install via the [Chrome Web Store search](https://chromewebstore.google.com/search/Iris%20Privacy%20AI%20Safety) (look for **Iris** — *Privacy & AI Safety*, or search by name in your locale).
+
+You can still load the folder unpacked from source if you prefer (see above).
 
 ---
 
@@ -153,6 +158,12 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 ## Roadmap
+
+See **[ROADMAP.md](ROADMAP.md)** for the full plan. In short:
+
+- **In progress (v1.2):** Content safety — domains, on-page signals, and a parent-facing rating (observable, not blocking).
+
+Then:
 
 - [ ] Historical tracking data (last 30 days)
 - [ ] Cross-site comparison ("this site tracks more than 89% of analyzed sites" — with real data)

@@ -37,6 +37,21 @@
 
   window.addEventListener("message", (event) => {
     if (!event.data?.__uncloak) return;
+    if (event.data.api === "content-safety-scan") {
+      let detail;
+      try {
+        detail = JSON.parse(event.data.detail || "{}");
+      } catch {
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "CONTENT_SAFETY_SCAN",
+        keywords: detail.keywords || [],
+        manipulation: detail.manipulation || [],
+      });
+      return;
+    }
+
     const { api } = event.data;
     if (!api || reported.has(api)) return;
 

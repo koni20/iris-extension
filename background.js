@@ -1,4 +1,4 @@
-importScripts("trackers.js");
+importScripts("trackers.js", "contentSafety.js");
 
 // ── 追踪器数据库动态更新 ────────────────────────────────────────────────────────
 const DB_CACHE_KEY  = "irisTrackerCache";
@@ -94,13 +94,106 @@ async function refreshTrackerDB() {
   }
 }
 
+// ── 内容安全列表动态更新（uBlock adult 等）─────────────────────────────────────
+const CS_CACHE_KEY = "irisContentSafetyCache";
+const UBLOCK_ADULT_URL =
+  "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/adult.txt";
+
+function parseUblockAdultDomains(text) {
+  const p = plainForCategory("Adult");
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("!")) continue;
+    const m = t.match(/^\|\|([^/^|*]+)\^/);
+    if (!m) continue;
+    const host = m[1].replace(/^www\./, "");
+    if (host.includes("*") || host.includes("#")) continue;
+    out[host] = { category: "Adult", plain_en: p.plain_en, plain_zh: p.plain_zh };
+  }
+  return out;
+}
+
+async function refreshContentSafetyDB() {
+  try {
+    const stored = await chrome.storage.local.get(CS_CACHE_KEY);
+    const cache = stored[CS_CACHE_KEY];
+    const now = Date.now();
+
+    if (cache && (now - cache.timestamp) < DB_TTL_MS) {
+      const added = mergeContentSafetySeed(cache.data);
+      console.log(
+        `[Iris] Content safety DB from cache (+${added} domains, updated ${new Date(cache.timestamp).toLocaleDateString()})`
+      );
+      return;
+    }
+
+    console.log("[Iris] Fetching uBlock adult filter for content safety...");
+    const resp = await fetch(UBLOCK_ADULT_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const text = await resp.text();
+    const parsed = parseUblockAdultDomains(text);
+    const added = mergeContentSafetySeed(parsed);
+
+    await chrome.storage.local.set({
+      [CS_CACHE_KEY]: { data: parsed, timestamp: now, count: Object.keys(parsed).length },
+    });
+
+    console.log(`[Iris] Content safety DB refreshed: +${added} new adult domains (list size ${Object.keys(parsed).length})`);
+  } catch (err) {
+    console.warn("[Iris] Content safety refresh failed:", err.message);
+  }
+}
+
+async function getCSMeta() {
+  const stored = await chrome.storage.local.get(CS_CACHE_KEY);
+  const cache = stored[CS_CACHE_KEY];
+  if (!cache) return { updatedAt: null, dynamicCount: 0 };
+  return { updatedAt: cache.timestamp, dynamicCount: cache.count || 0 };
+}
+
+function computeContentSafetyRating(cs) {
+  const domains = cs.domainMatches || [];
+  const keywords = cs.keywords || [];
+  const manip = cs.manipulation || [];
+
+  const redCat = new Set(["Adult", "Gambling", "Scam", "Extreme"]);
+  const yellowCat = new Set(["Violence"]);
+
+  for (const d of domains) {
+    if (redCat.has(d.category)) return "red";
+  }
+
+  let band = 0;
+  for (const d of domains) {
+    if (yellowCat.has(d.category)) band = Math.max(band, 1);
+  }
+
+  let mild = 0;
+  for (const k of keywords) {
+    if (k.level === "severe") return "red";
+    if (k.level === "moderate") band = Math.max(band, 1);
+    if (k.level === "mild") mild++;
+  }
+  if (mild >= 5) band = Math.max(band, 1);
+
+  if (manip.length > 0) band = Math.max(band, 1);
+
+  if (band >= 1) return "yellow";
+  return "green";
+}
+
 // 扩展启动时立即执行一次更新
 refreshTrackerDB();
+refreshContentSafetyDB();
 
 // 每隔 7 天自动重新拉取（用 alarm 保证 service worker 被唤醒）
 chrome.alarms.create("refreshTrackerDB", { periodInMinutes: 7 * 24 * 60 });
+chrome.alarms.create("refreshContentSafetyDB", { periodInMinutes: 7 * 24 * 60 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "refreshTrackerDB") refreshTrackerDB();
+  if (alarm.name === "refreshContentSafetyDB") refreshContentSafetyDB();
 });
 
 // GET_DATA 时也可查询数据库状态
@@ -127,7 +220,12 @@ function getTabData(tabId) {
       apiCalls: [],
       aiCalls:  [],        // AI 服务调用记录
       totalRequests: 0,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      contentSafety: {
+        domainMatches: [],
+        keywords: [],
+        manipulation: [],
+      },
     });
   }
   return tabData.get(tabId);
@@ -162,6 +260,21 @@ chrome.webRequest.onBeforeRequest.addListener(
         updateBadge(tabId, data);
       }
     }
+
+    const csHit = matchContentSafety(hostname);
+    if (csHit) {
+      const dm = data.contentSafety.domainMatches;
+      const dup = dm.some((x) => x.domain === csHit.domain && x.category === csHit.category);
+      if (!dup) {
+        dm.push({
+          domain: csHit.domain,
+          category: csHit.category,
+          plain_en: csHit.plain_en,
+          plain_zh: csHit.plain_zh,
+          time: Date.now(),
+        });
+      }
+    }
   },
   { urls: ["<all_urls>"] }
 );
@@ -190,14 +303,14 @@ function updateBadge(tabId, data) {
   const text  = count > 0 ? String(count) : "";
   const color = hasHighRisk ? "#ef4444" : count > 5 ? "#f59e0b" : "#7c6af7";
 
-  chrome.action.setBadgeText({ text, tabId });
-  if (text) chrome.action.setBadgeBackgroundColor({ color, tabId });
+  chrome.action.setBadgeText({ text, tabId }).catch(() => {});
+  if (text) chrome.action.setBadgeBackgroundColor({ color, tabId }).catch(() => {});
 }
 
 // service worker 被唤醒后 tabData 已丢失时，强制清除遗留 badge
 function clearStaleBadge(tabId) {
   if (!tabData.has(tabId)) {
-    chrome.action.setBadgeText({ text: "", tabId });
+    chrome.action.setBadgeText({ text: "", tabId }).catch(() => {});
   }
 }
 
@@ -205,7 +318,7 @@ function clearStaleBadge(tabId) {
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId === 0) {
     tabData.delete(details.tabId);
-    chrome.action.setBadgeText({ text: "", tabId: details.tabId });
+    chrome.action.setBadgeText({ text: "", tabId: details.tabId }).catch(() => {});
   }
 });
 
@@ -218,7 +331,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "loading" && tab.active) {
     tabData.delete(tabId);
-    chrome.action.setBadgeText({ text: "", tabId });
+    chrome.action.setBadgeText({ text: "", tabId }).catch(() => {});
     chrome.runtime.sendMessage({ type: "TAB_LOADING" }).catch(() => {});
   }
 });
@@ -233,7 +346,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Popup 请求当前 tab 数据
   if (message.type === "GET_DATA") {
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (!tabs[0]) return sendResponse({ trackers: [], totalRequests: 0, apiCalls: [] });
+      if (!tabs[0]) {
+        return sendResponse({
+          trackers: [],
+          totalRequests: 0,
+          apiCalls: [],
+          contentSafety: {
+            rating: "green",
+            domainMatches: [],
+            keywords: [],
+            manipulation: [],
+          },
+          csMeta: await getCSMeta(),
+        });
+      }
       clearStaleBadge(tabs[0].id);   // service worker 刚唤醒时清除残留 badge
       const data = getTabData(tabs[0].id);
 
@@ -258,6 +384,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // 数据库元信息（给 popup 展示）
       const dbMeta = await getDBMeta();
+      const csMeta = await getCSMeta();
+      const cs = data.contentSafety;
+      const contentSafety = {
+        rating: computeContentSafetyRating(cs),
+        domainMatches: cs.domainMatches,
+        keywords: cs.keywords,
+        manipulation: cs.manipulation,
+      };
 
       // 每次 popup 拉取时都同步 badge，防止 service worker 休眠后 badge 残留
       updateBadge(tabs[0].id, data);
@@ -269,6 +403,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         aiCalls,
         phishing,
         dbMeta,
+        csMeta,
+        contentSafety,
         url: tabUrl
       });
     });
@@ -307,5 +443,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       existing.count++;
     }
     updateBadge(sender.tab.id, data);
+  }
+
+  if (message.type === "CONTENT_SAFETY_SCAN" && sender.tab) {
+    const data = getTabData(sender.tab.id);
+    const cs = data.contentSafety;
+    for (const kw of message.keywords || []) {
+      const dup = cs.keywords.some((k) => k.level === kw.level && k.match === kw.match);
+      if (!dup) cs.keywords.push(kw);
+    }
+    for (const m of message.manipulation || []) {
+      const dup = cs.manipulation.some((x) => x.type === m.type && x.hint === m.hint);
+      if (!dup) cs.manipulation.push(m);
+    }
   }
 });
