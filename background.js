@@ -95,12 +95,17 @@ async function refreshTrackerDB() {
 }
 
 // ── 内容安全列表动态更新（uBlock adult 等）─────────────────────────────────────
-const CS_CACHE_KEY = "irisContentSafetyCache";
+const CS_CACHE_KEY = "irisContentSafetyCacheV2";
 const UBLOCK_ADULT_URL =
   "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/adult.txt";
+const STEVENBLACK_GAMBLING_HOSTS =
+  "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts";
+const UBLOCK_BADWARE_URL =
+  "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt";
 
-function parseUblockAdultDomains(text) {
-  const p = plainForCategory("Adult");
+/** uBlock 风格 ||domain^ 规则 → 指定分类 */
+function parseUblockFilterDomains(text, category) {
+  const p = plainForCategory(category);
   const out = {};
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
@@ -109,9 +114,54 @@ function parseUblockAdultDomains(text) {
     if (!m) continue;
     const host = m[1].replace(/^www\./, "");
     if (host.includes("*") || host.includes("#")) continue;
-    out[host] = { category: "Adult", plain_en: p.plain_en, plain_zh: p.plain_zh };
+    out[host] = { category, plain_en: p.plain_en, plain_zh: p.plain_zh };
   }
   return out;
+}
+
+function parseUblockAdultDomains(text) {
+  return parseUblockFilterDomains(text, "Adult");
+}
+
+/** Hosts 文件（0.0.0.0 / 127.0.0.1 domain）→ 指定分类 */
+function parseHostsFile(text, category) {
+  const p = plainForCategory(category);
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const m = t.match(/^(\d+\.\d+\.\d+\.\d+)\s+(\S+)/);
+    if (!m) continue;
+    let host = m[2].toLowerCase().replace(/^www\./, "");
+    if (
+      host === "localhost" ||
+      host === "local" ||
+      host === "broadcasthost" ||
+      host.endsWith(".local") ||
+      host.includes("/")
+    ) {
+      continue;
+    }
+    out[host] = { category, plain_en: p.plain_en, plain_zh: p.plain_zh };
+  }
+  return out;
+}
+
+/** 合并顺序靠后者覆盖前者；最终以 Adult > Gambling > Scam 优先级手工合成 */
+function mergeContentSafetyMaps(adultMap, gambleMap, scamMap) {
+  return { ...scamMap, ...gambleMap, ...adultMap };
+}
+
+async function fetchContentSafetyPart(url, label, parser) {
+  try {
+    const resp = await fetch(url, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    return parser(text);
+  } catch (err) {
+    console.warn(`[Iris] Content safety list "${label}" failed:`, err.message);
+    return {};
+  }
 }
 
 async function refreshContentSafetyDB() {
@@ -128,19 +178,41 @@ async function refreshContentSafetyDB() {
       return;
     }
 
-    console.log("[Iris] Fetching uBlock adult filter for content safety...");
-    const resp = await fetch(UBLOCK_ADULT_URL, { cache: "no-store" });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    console.log("[Iris] Fetching content safety lists (adult + gambling hosts + badware)...");
 
-    const text = await resp.text();
-    const parsed = parseUblockAdultDomains(text);
+    const [adultMap, gambleMap, scamMap] = await Promise.all([
+      fetchContentSafetyPart(UBLOCK_ADULT_URL, "uBlock adult", parseUblockAdultDomains),
+      fetchContentSafetyPart(
+        STEVENBLACK_GAMBLING_HOSTS,
+        "StevenBlack gambling hosts",
+        (txt) => parseHostsFile(txt, "Gambling")
+      ),
+      fetchContentSafetyPart(
+        UBLOCK_BADWARE_URL,
+        "uBlock badware",
+        (txt) => parseUblockFilterDomains(txt, "Scam")
+      ),
+    ]);
+
+    const parsed = mergeContentSafetyMaps(adultMap, gambleMap, scamMap);
     const added = mergeContentSafetySeed(parsed);
 
     await chrome.storage.local.set({
-      [CS_CACHE_KEY]: { data: parsed, timestamp: now, count: Object.keys(parsed).length },
+      [CS_CACHE_KEY]: {
+        data: parsed,
+        timestamp: now,
+        count: Object.keys(parsed).length,
+        breakdown: {
+          adult: Object.keys(adultMap).length,
+          gambling: Object.keys(gambleMap).length,
+          scam: Object.keys(scamMap).length,
+        },
+      },
     });
 
-    console.log(`[Iris] Content safety DB refreshed: +${added} new adult domains (list size ${Object.keys(parsed).length})`);
+    console.log(
+      `[Iris] Content safety DB refreshed: +${added} new domains (merged ${Object.keys(parsed).length}: adult ${Object.keys(adultMap).length}, gambling ${Object.keys(gambleMap).length}, scam ${Object.keys(scamMap).length})`
+    );
   } catch (err) {
     console.warn("[Iris] Content safety refresh failed:", err.message);
   }
@@ -149,8 +221,12 @@ async function refreshContentSafetyDB() {
 async function getCSMeta() {
   const stored = await chrome.storage.local.get(CS_CACHE_KEY);
   const cache = stored[CS_CACHE_KEY];
-  if (!cache) return { updatedAt: null, dynamicCount: 0 };
-  return { updatedAt: cache.timestamp, dynamicCount: cache.count || 0 };
+  if (!cache) return { updatedAt: null, dynamicCount: 0, breakdown: null };
+  return {
+    updatedAt: cache.timestamp,
+    dynamicCount: cache.count || 0,
+    breakdown: cache.breakdown || null,
+  };
 }
 
 function computeContentSafetyRating(cs) {

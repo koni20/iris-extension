@@ -220,8 +220,9 @@
   ];
   const CS_ZH_MODERATE = [
     "网络赌博", "博彩网站", "投注平台", "在线赌场", "棋牌捕鱼", "菠菜平台",
+    "杀猪盘", "兼职刷单", "血腥场面",
   ];
-  const CS_ZH_MILD = ["棋牌游戏", "彩票投注", "电竞投注"];
+  const CS_ZH_MILD = ["彩票投注", "电竞投注"];
 
   const CS_EN_SEVERE = [];
   const CS_EN_MODERATE = [
@@ -268,6 +269,12 @@
     }
     if (/限时|仅此一天|错过再等|倒计时/.test(text) && /会员|VIP|订阅|解锁|付费观看/.test(text)) {
       out.push({ type: "urgency_paywall", hint: "urgency_membership" });
+    }
+    if (/小黄车|橱窗|同款好物|视频同款/.test(text) && /秒杀|限时抢|仅剩|下单|抢购/.test(text)) {
+      out.push({ type: "commerce_push", hint: "live_commerce_urgency" });
+    }
+    if (/粉丝团|加入粉丝|灯牌|贵族/.test(text) && /元|钻|币|充值/.test(text)) {
+      out.push({ type: "fan_monetization", hint: "live_fan_payment" });
     }
     return out;
   }

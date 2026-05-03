@@ -66,6 +66,9 @@ function addCS(domain, category) {
     "ignitioncasino.eu",
   ];
   gamble.forEach(d => addCS(d, "Gambling"));
+
+  const violence = ["liveleak.com"];
+  violence.forEach(d => addCS(d, "Violence"));
 })();
 
 /** 运行时合并的动态域名（与 TRACKER_DB 动态部分同理） */

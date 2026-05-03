@@ -136,6 +136,8 @@ const TRANSLATIONS = {
     csManipType: "Behavior pattern",
     csManip_live_tip_payment: "Streaming tip / recharge prompts (monetization pattern).",
     csManip_urgency_membership: "Urgent membership or paywall messaging.",
+    csManip_live_commerce_urgency: "Shop or same-style links plus rush-buy wording (short-video commerce pattern).",
+    csManip_live_fan_payment: "Fan club / badge prompts tied to paid coins or top-ups.",
   },
 
   // ── 简体中文 ────────────────────────────────────────────────────────────────
@@ -259,6 +261,8 @@ const TRANSLATIONS = {
     csManipType: "行为模式",
     csManip_live_tip_payment: "直播打赏 / 充值引导（常见变现话术）。",
     csManip_urgency_membership: "限时会员 / 付费墙紧迫感话术。",
+    csManip_live_commerce_urgency: "小黄车 / 橱窗与限时秒杀、抢购等带货紧迫感组合。",
+    csManip_live_fan_payment: "粉丝团、灯牌等与充值、虚拟币组合的话术。",
   },
 
   // ── 日语 ────────────────────────────────────────────────────────────────────
@@ -355,6 +359,8 @@ const TRANSLATIONS = {
     csManipType: "行動パターン",
     csManip_live_tip_payment: "配信・投げ銭 / 課金の誘導パターン。",
     csManip_urgency_membership: "期間限定・会員登録の煽り文句。",
+    csManip_live_commerce_urgency: "ショート動画の「同款」ショップと限定セール煽りの組み合わせ。",
+    csManip_live_fan_payment: "ファンクラブ・バッジとコイン課金を組み合わせた誘導。",
   },
 
   // ── 西班牙语 ────────────────────────────────────────────────────────────────
@@ -451,6 +457,8 @@ const TRANSLATIONS = {
     csManipType: "Patrón",
     csManip_live_tip_payment: "Propinas en vivo / recarga (patrón de monetización).",
     csManip_urgency_membership: "Mensajes urgentes de membresía o muro de pago.",
+    csManip_live_commerce_urgency: "Tienda en video corto + urgencia de compra (patrón típico).",
+    csManip_live_fan_payment: "Club de fans / insignias ligados a moneda de pago o recarga.",
   },
 
   // ── 法语 ────────────────────────────────────────────────────────────────────
@@ -547,6 +555,8 @@ const TRANSLATIONS = {
     csManipType: "Schéma",
     csManip_live_tip_payment: "Pourboires live / recharge (monétisation type streaming).",
     csManip_urgency_membership: "Message urgent d'abonnement ou paywall.",
+    csManip_live_commerce_urgency: "Boutique vidéo courte + urgence d'achat (schéma fréquent).",
+    csManip_live_fan_payment: "Club de fans / badges liés aux pièces payantes ou recharges.",
   },
 
   // ── 德语 ────────────────────────────────────────────────────────────────────
@@ -643,6 +653,8 @@ const TRANSLATIONS = {
     csManipType: "Verhaltensmuster",
     csManip_live_tip_payment: "Live-Trinkgeld / Aufladung (Streaming-Monetarisierung).",
     csManip_urgency_membership: "Dringende Mitgliedschaft / Paywall-Dringlichkeit.",
+    csManip_live_commerce_urgency: "Kurzvideo-Shop plus Schnäppchen-/Countdown-Druck.",
+    csManip_live_fan_payment: "Fanclub-/Badge-Hinweise mit bezahlten Coins oder Aufladung.",
   }
 };
 

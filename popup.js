@@ -152,8 +152,16 @@ function renderDBMeta(dbMeta, csMeta) {
 
   if (csMeta && csMeta.updatedAt) {
     const csd = Math.floor((Date.now() - csMeta.updatedAt) / 86400000);
-    const n = csMeta.dynamicCount ? `${csMeta.dynamicCount.toLocaleString()} adult domains · ` : "";
-    parts.push(`content ${n}${t.dbUpdated(csd)}`);
+    let csPart = "";
+    if (csMeta.dynamicCount) {
+      if (csMeta.breakdown) {
+        const b = csMeta.breakdown;
+        csPart = `${csMeta.dynamicCount.toLocaleString()} domains (A${b.adult}+G${b.gambling}+S${b.scam}) · `;
+      } else {
+        csPart = `${csMeta.dynamicCount.toLocaleString()} domains · `;
+      }
+    }
+    parts.push(`content ${csPart}${t.dbUpdated(csd)}`);
   }
 
   status.textContent = parts.join(" · ");
