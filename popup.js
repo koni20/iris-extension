@@ -1,22 +1,34 @@
+// ── 安全转义（防止 innerHTML 注入）─────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── 初始化静态 UI 文字 ─────────────────────────────────────────────────────────
 document.getElementById("verdictTitle").textContent = t.scanning;
 document.getElementById("verdictSub").textContent   = t.loadingData;
-document.querySelector('[data-tab="trackers"]').textContent   = t.tabTrackers;
-document.querySelector('[data-tab="apis"]').textContent       = t.tabBrowserAPIs;
-document.getElementById("emptyTrackers").querySelector(".empty-title").textContent = t.noTrackersTitle;
-document.getElementById("emptyTrackers").querySelector(".empty-sub").textContent   = t.noTrackersSub;
-document.getElementById("emptyApis").querySelector(".empty-title").textContent     = t.noApisTitle;
-document.getElementById("emptyApis").querySelector(".empty-sub").textContent       = t.noApisSub;
-document.querySelector(".comp-ends span:first-child").textContent = t.privacyFriendly;
-document.querySelector(".comp-ends span:last-child").textContent  = t.mostInvasive;
-document.getElementById("statTrackers").closest(".stat").querySelector(".stat-label").textContent = t.trackers;
-document.getElementById("statRequests").closest(".stat").querySelector(".stat-label").textContent  = t.requests;
-document.getElementById("statApis").closest(".stat").querySelector(".stat-label").textContent      = t.apiCalls;
-
-document.querySelector(".ai-tab-label").textContent = t.tabAiSafety;
-document.getElementById("tabBtnContent").textContent = t.tabContentSafety;
+document.getElementById("tabBtnTrackers").textContent = t.tabTrackers;
+document.getElementById("tabBtnApis").textContent     = t.tabBrowserAPIs;
+document.querySelector("#tabBtnAi .ai-tab-label").textContent = t.tabAiSafety;
+document.getElementById("tabBtnContent").textContent  = t.tabContentSafety;
+document.getElementById("tabBtnSpend").textContent    = t.tabSpendGuard;
+document.getElementById("emptyTrackersTitle").textContent = t.noTrackersTitle;
+document.getElementById("emptyTrackersSub").textContent   = t.noTrackersSub;
+document.getElementById("emptyApisTitle").textContent     = t.noApisTitle;
+document.getElementById("emptyApisSub").textContent       = t.noApisSub;
+document.getElementById("compEndLeft").textContent  = t.privacyFriendly;
+document.getElementById("compEndRight").textContent = t.mostInvasive;
+document.getElementById("statLabelTrackers").textContent = t.trackers;
+document.getElementById("statLabelRequests").textContent = t.requests;
+document.getElementById("statLabelApis").textContent     = t.apiCalls;
 document.getElementById("emptyContentTitle").textContent = t.csEmptyTitle;
-document.getElementById("emptyContentSub").textContent = t.csEmptySub;
+document.getElementById("emptyContentSub").textContent   = t.csEmptySub;
+document.getElementById("emptySpendTitle").textContent   = t.subEmptyScanningTitle;
+document.getElementById("emptySpendSub").textContent     = t.subEmptyScanningSub;
 
 function initTabs() {
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -27,6 +39,7 @@ function initTabs() {
       document.getElementById("tabApis").classList.toggle("hidden", tab.dataset.tab !== "apis");
       document.getElementById("tabAi").classList.toggle("hidden", tab.dataset.tab !== "ai");
       document.getElementById("tabContent").classList.toggle("hidden", tab.dataset.tab !== "content");
+      document.getElementById("tabSpend").classList.toggle("hidden", tab.dataset.tab !== "spend");
     });
   });
 }
@@ -60,11 +73,22 @@ function resetToScanning() {
   document.getElementById("phishingBanner").classList.add("hidden");
   document.getElementById("contentSafetyList").innerHTML = "";
   lastContentSafetyJson = "";
+  lastAiSourcesJson = "";
+  lastSpendJson = "";
+  const asm = document.getElementById("aiSourcesMount");
+  if (asm) asm.innerHTML = "";
   const csSummary = document.getElementById("csSummary");
   if (csSummary) {
     csSummary.className = "cs-summary cs-rating-green";
     csSummary.innerHTML = "";
   }
+  const spendSummary = document.getElementById("spendSummary");
+  if (spendSummary) {
+    spendSummary.className = "cs-summary cs-rating-green";
+    spendSummary.innerHTML = "";
+  }
+  document.getElementById("spendList").innerHTML = "";
+  document.getElementById("emptySpend").classList.add("hidden");
 }
 
 // ── 监听来自 background 的 Tab 变化通知 ──────────────────────────────────────
@@ -82,19 +106,27 @@ chrome.runtime.onMessage.addListener((message) => {
 let lastTrackerCount = -1;
 let lastApiCount = -1;
 let lastContentSafetyJson = "";
+let lastAiSourcesJson = "";
+let lastSpendJson = "";
 
 function pollData() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
     if (chrome.runtime.lastError || !data) return;
     const csJson = JSON.stringify(data.contentSafety || {});
+    const asJson = JSON.stringify(data.aiSearchSources || null);
+    const spendJson = JSON.stringify(data.subscriptionGuard || null);
     const changed =
       data.trackers.length !== lastTrackerCount ||
       data.apiCalls.length !== lastApiCount ||
-      csJson !== lastContentSafetyJson;
+      csJson !== lastContentSafetyJson ||
+      asJson !== lastAiSourcesJson ||
+      spendJson !== lastSpendJson;
     if (changed) {
       lastTrackerCount = data.trackers.length;
       lastApiCount = data.apiCalls.length;
       lastContentSafetyJson = csJson;
+      lastAiSourcesJson = asJson;
+      lastSpendJson = spendJson;
       render(data);
     }
   });
@@ -206,9 +238,9 @@ function renderContentSafety(cs) {
     div.className = "cs-item cs-item-domain";
     const catLabel = (t.csCategories && t.csCategories[d.category]) || d.category;
     div.innerHTML = `
-      <div class="cs-item-tag">${catLabel}</div>
-      <div class="cs-item-domain">${d.domain}</div>
-      <div class="cs-item-plain">${useZh ? d.plain_zh : d.plain_en}</div>
+      <div class="cs-item-tag">${esc(catLabel)}</div>
+      <div class="cs-item-domain">${esc(d.domain)}</div>
+      <div class="cs-item-plain">${esc(useZh ? d.plain_zh : d.plain_en)}</div>
     `;
     list.appendChild(div);
   }
@@ -218,8 +250,8 @@ function renderContentSafety(cs) {
     div.className = "cs-item cs-item-kw cs-level-" + k.level;
     const lvlKey = "csLevel_" + k.level;
     div.innerHTML = `
-      <div class="cs-item-tag">${t[lvlKey] || k.level}</div>
-      <div class="cs-item-plain">${typeof t.csKeywordMatch === "function" ? t.csKeywordMatch(k.match) : k.match}</div>
+      <div class="cs-item-tag">${esc(t[lvlKey] || k.level)}</div>
+      <div class="cs-item-plain">${esc(typeof t.csKeywordMatch === "function" ? t.csKeywordMatch(k.match) : k.match)}</div>
     `;
     list.appendChild(div);
   }
@@ -230,11 +262,89 @@ function renderContentSafety(cs) {
     const hintKey = "csManip_" + m.hint;
     const msg = t[hintKey] || m.hint;
     div.innerHTML = `
-      <div class="cs-item-tag">${t.csManipType}</div>
-      <div class="cs-item-plain">${msg}</div>
+      <div class="cs-item-tag">${esc(t.csManipType)}</div>
+      <div class="cs-item-plain">${esc(msg)}</div>
     `;
     list.appendChild(div);
   }
+}
+
+function renderSpendGuard(subscriptionGuard) {
+  const summary = document.getElementById("spendSummary");
+  const list = document.getElementById("spendList");
+  const empty = document.getElementById("emptySpend");
+  if (!summary || !list || !empty) return;
+
+  const disc = `<div class="ai-sources-disclaimer" style="margin-top:8px;">${t.subDisclaimer || ""}</div>`;
+
+  if (subscriptionGuard == null) {
+    summary.className = "cs-summary cs-rating-neutral";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">🔍</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.subEmptyScanningTitle || ""}</div>
+        <div class="cs-rating-sub">${t.subEmptyScanningSub || ""}</div>
+      </div>
+    `;
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    return;
+  }
+
+  const rating = subscriptionGuard.rating || "neutral";
+  const hits = subscriptionGuard.hits || [];
+
+  if (rating === "neutral") {
+    summary.className = "cs-summary cs-rating-neutral";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">➖</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.subSummary_neutralTitle || ""}</div>
+        <div class="cs-rating-sub">${t.subSummary_neutralSub || ""}</div>
+        ${disc}
+      </div>
+    `;
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    return;
+  }
+
+  if (rating === "green") {
+    summary.className = "cs-summary cs-rating-green";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">🟢</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.subSummary_greenTitle || ""}</div>
+        <div class="cs-rating-sub">${t.subSummary_greenSub || ""}</div>
+        ${disc}
+      </div>
+    `;
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    return;
+  }
+
+  summary.className = "cs-summary cs-rating-yellow";
+  summary.innerHTML = `
+    <div class="cs-rating-icon">🟡</div>
+    <div class="cs-rating-body">
+      <div class="cs-rating-title">${t.subSummary_yellowTitle || ""}</div>
+      <div class="cs-rating-sub">${t.subSummary_yellowSub || ""}</div>
+      ${disc}
+    </div>
+  `;
+  list.innerHTML = "";
+  for (const h of hits) {
+    const div = document.createElement("div");
+    div.className = "cs-item cs-item-manip";
+    const msg = (h && h.id && t[h.id]) || (h && h.id) || "";
+    div.innerHTML = `
+      <div class="cs-item-tag">${esc(t.subSigTag || "Pattern")}</div>
+      <div class="cs-item-plain">${esc(msg)}</div>
+    `;
+    list.appendChild(div);
+  }
+  empty.classList.add("hidden");
 }
 
 function render({
@@ -246,6 +356,8 @@ function render({
   dbMeta = null,
   csMeta = null,
   contentSafety = null,
+  aiSearchSources = null,
+  subscriptionGuard = null,
   url,
 }) {
   // 钓鱼警告（最优先渲染）
@@ -255,6 +367,8 @@ function render({
   renderDBMeta(dbMeta, csMeta);
 
   renderContentSafety(contentSafety || { rating: "green", domainMatches: [], keywords: [], manipulation: [] });
+
+  renderSpendGuard(subscriptionGuard);
 
   // 站点名
   let hostname = "—";
@@ -281,13 +395,16 @@ function render({
   // API 调用列表
   renderApis(apiCalls);
 
-  // AI 调用列表
-  renderAiCalls(aiCalls);
+  // AI 调用列表 + 引用来源（v1.3）
+  renderAiCalls(aiCalls, aiSearchSources);
 
   // AI badge
   const aiBadge = document.getElementById("aiBadge");
-  if (aiCalls.length > 0) {
-    aiBadge.textContent = aiCalls.length;
+  const citeLow =
+    aiSearchSources && aiSearchSources.counts ? aiSearchSources.counts.low + aiSearchSources.counts.caution : 0;
+  const badgeN = aiCalls.length > 0 ? aiCalls.length : citeLow > 0 ? citeLow : 0;
+  if (badgeN > 0) {
+    aiBadge.textContent = String(badgeN);
     aiBadge.classList.remove("hidden");
   } else {
     aiBadge.classList.add("hidden");
@@ -424,12 +541,12 @@ function renderTrackers(trackers) {
 
     item.innerHTML = `
       <div class="tracker-row">
-        <span class="tracker-tag ${tagClass}">${categoryLabel}</span>
-        <span class="tracker-domain">${tracker.domain}</span>
+        <span class="tracker-tag ${esc(tagClass)}">${esc(categoryLabel)}</span>
+        <span class="tracker-domain">${esc(tracker.domain)}</span>
         <span class="tracker-chevron">▼</span>
       </div>
-      <div class="tracker-company">${tracker.company}</div>
-      <div class="tracker-plain">${tracker.plain}</div>
+      <div class="tracker-company">${esc(tracker.company)}</div>
+      <div class="tracker-plain">${esc(tracker.plain)}</div>
     `;
 
     item.addEventListener("click", () => item.classList.toggle("expanded"));
@@ -437,8 +554,81 @@ function renderTrackers(trackers) {
   });
 }
 
+function formatAiSourceReason(r) {
+  if (r.kind === "contentSafety") return (t.csCategories && t.csCategories[r.category]) || r.category;
+  if (r.kind === "tracker") return (t.categories && t.categories[r.category]) || r.category;
+  if (r.kind === "citationList" && r.key && t[r.key]) return t[r.key];
+  return "";
+}
+
+function renderAiSearchSources(aiSearchSources) {
+  const mount = document.getElementById("aiSourcesMount");
+  if (!mount) return;
+  mount.innerHTML = "";
+
+  if (!aiSearchSources || !Array.isArray(aiSearchSources.sources)) {
+    return;
+  }
+
+  const { sources, rating, counts } = aiSearchSources;
+  const wrap = document.createElement("div");
+  wrap.className = "ai-sources-wrap";
+
+  const sum = document.createElement("div");
+  sum.className = "ai-sources-summary cs-rating-" + (rating === "red" ? "red" : rating === "yellow" ? "yellow" : "green");
+  const icon = rating === "red" ? "🔴" : rating === "yellow" ? "🟡" : "🟢";
+  const summaryLine =
+    typeof t.aiSourcesSummary === "function"
+      ? t.aiSourcesSummary(counts)
+      : `${counts.total} sources`;
+  sum.innerHTML = `
+    <div class="cs-rating-icon">${icon}</div>
+    <div class="cs-rating-body">
+      <div class="cs-rating-title">${t.aiSourcesHeading || "Citation sources"}</div>
+      <div class="cs-rating-sub">${summaryLine}</div>
+      <div class="ai-sources-disclaimer">${t.aiSourcesDisclaimer || ""}</div>
+    </div>
+  `;
+  wrap.appendChild(sum);
+
+  if (sources.length === 0) {
+    const emptyRow = document.createElement("div");
+    emptyRow.className = "ai-sources-empty";
+    emptyRow.textContent = t.aiSourcesEmpty || "No external links yet.";
+    wrap.appendChild(emptyRow);
+    mount.appendChild(wrap);
+    return;
+  }
+
+  const tierLabel = (tier) =>
+    ({
+      low: t.aiSourceTier_low || "Low trust",
+      caution: t.aiSourceTier_caution || "Review",
+      ok: t.aiSourceTier_ok || "OK",
+    })[tier] || tier;
+
+  sources.forEach((s, i) => {
+    const row = document.createElement("div");
+    row.className = "ai-source-row tier-" + s.tier;
+    row.style.animationDelay = `${i * 35}ms`;
+    const reasonStr = (s.reasons || []).map(formatAiSourceReason).filter(Boolean).join(" · ");
+    row.innerHTML = `
+      <div class="ai-source-main">
+        <span class="ai-source-tier">${esc(tierLabel(s.tier))}</span>
+        <span class="ai-source-host">${esc(s.hostname)}</span>
+      </div>
+      ${reasonStr ? `<div class="ai-source-reasons">${esc(reasonStr)}</div>` : ""}
+    `;
+    wrap.appendChild(row);
+  });
+
+  mount.appendChild(wrap);
+}
+
 // ── 渲染 AI 调用列表 ────────────────────────────────────────────────────────────
-function renderAiCalls(aiCalls) {
+function renderAiCalls(aiCalls, aiSearchSources) {
+  renderAiSearchSources(aiSearchSources);
+
   const list  = document.getElementById("aiList");
   const empty = document.getElementById("emptyAi");
 
@@ -447,8 +637,14 @@ function renderAiCalls(aiCalls) {
   document.getElementById("emptyAiTitle").textContent = t.noAiTitle || "No AI services detected";
   document.getElementById("emptyAiSub").textContent   = t.noAiSub   || "This page doesn't appear to be sending your data to any AI APIs.";
 
-  if (aiCalls.length === 0) {
+  const hasCitationPanel = aiSearchSources != null;
+
+  if (aiCalls.length === 0 && !hasCitationPanel) {
     empty.style.display = "flex";
+    return;
+  }
+  if (aiCalls.length === 0 && hasCitationPanel) {
+    empty.style.display = "none";
     return;
   }
   empty.style.display = "none";
@@ -510,15 +706,15 @@ function renderAiCalls(aiCalls) {
 
     item.innerHTML = `
       <div class="ai-header">
-        <div class="ai-logo">${emoji}</div>
+        <div class="ai-logo">${esc(emoji)}</div>
         <div class="ai-info">
-          <div class="ai-company">${call.company}</div>
-          <div class="ai-model">${call.model}</div>
+          <div class="ai-company">${esc(call.company)}</div>
+          <div class="ai-model">${esc(call.model)}</div>
         </div>
-        <span class="ai-risk-tag ai-risk-${call.risk || "medium"}">${riskLabel}</span>
+        <span class="ai-risk-tag ai-risk-${esc(call.risk || "medium")}">${esc(riskLabel)}</span>
       </div>
-      <div class="ai-count">${countText}</div>
-      <div class="ai-plain">${plainText}</div>
+      <div class="ai-count">${esc(countText)}</div>
+      <div class="ai-plain">${esc(plainText)}</div>
     `;
     list.appendChild(item);
   });
@@ -552,10 +748,10 @@ function renderApis(apiCalls) {
     item.innerHTML = `
       <div class="api-row">
         <div class="api-risk-dot"></div>
-        <div class="api-label">${displayLabel}</div>
-        <span style="font-size:9.5px;font-weight:700;color:${riskColor};letter-spacing:0.4px;">${riskLabel}</span>
+        <div class="api-label">${esc(displayLabel)}</div>
+        <span style="font-size:9.5px;font-weight:700;color:${esc(riskColor)};letter-spacing:0.4px;">${esc(riskLabel)}</span>
       </div>
-      <div class="api-plain">${displayPlain}</div>
+      <div class="api-plain">${esc(displayPlain)}</div>
     `;
 
     list.appendChild(item);

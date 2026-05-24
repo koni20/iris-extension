@@ -1,4 +1,4 @@
-importScripts("trackers.js", "contentSafety.js");
+importScripts("trackers.js", "contentSafety.js", "citationLowTrust.js");
 
 // ── 追踪器数据库动态更新 ────────────────────────────────────────────────────────
 const DB_CACHE_KEY  = "irisTrackerCache";
@@ -69,28 +69,22 @@ async function refreshTrackerDB() {
     const now    = Date.now();
 
     if (cache && (now - cache.timestamp) < DB_TTL_MS) {
-      // 缓存有效：直接合并，不再请求网络
-      const added = mergeTrackerData(cache.data);
-      console.log(`[Iris] Tracker DB loaded from cache (+${added} domains, updated ${new Date(cache.timestamp).toLocaleDateString()})`);
+      mergeTrackerData(cache.data);
       return;
     }
 
-    console.log("[Iris] Fetching latest tracker list from Disconnect.me...");
     const resp = await fetch(DISCONNECT_URL, { cache: "no-store" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
     const json   = await resp.json();
     const parsed = parseDisconnectList(json);
-    const added  = mergeTrackerData(parsed);
+    mergeTrackerData(parsed);
 
     await chrome.storage.local.set({
       [DB_CACHE_KEY]: { data: parsed, timestamp: now, count: Object.keys(parsed).length }
     });
-
-    console.log(`[Iris] Tracker DB refreshed: +${added} new domains (total dynamic: ${Object.keys(parsed).length})`);
-  } catch (err) {
+  } catch {
     // 网络失败时静默降级，使用静态数据库
-    console.warn("[Iris] Tracker DB refresh failed, using built-in data:", err.message);
   }
 }
 
@@ -158,8 +152,7 @@ async function fetchContentSafetyPart(url, label, parser) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
     return parser(text);
-  } catch (err) {
-    console.warn(`[Iris] Content safety list "${label}" failed:`, err.message);
+  } catch {
     return {};
   }
 }
@@ -171,14 +164,9 @@ async function refreshContentSafetyDB() {
     const now = Date.now();
 
     if (cache && (now - cache.timestamp) < DB_TTL_MS) {
-      const added = mergeContentSafetySeed(cache.data);
-      console.log(
-        `[Iris] Content safety DB from cache (+${added} domains, updated ${new Date(cache.timestamp).toLocaleDateString()})`
-      );
+      mergeContentSafetySeed(cache.data);
       return;
     }
-
-    console.log("[Iris] Fetching content safety lists (adult + gambling hosts + badware)...");
 
     const [adultMap, gambleMap, scamMap] = await Promise.all([
       fetchContentSafetyPart(UBLOCK_ADULT_URL, "uBlock adult", parseUblockAdultDomains),
@@ -195,7 +183,7 @@ async function refreshContentSafetyDB() {
     ]);
 
     const parsed = mergeContentSafetyMaps(adultMap, gambleMap, scamMap);
-    const added = mergeContentSafetySeed(parsed);
+    mergeContentSafetySeed(parsed);
 
     await chrome.storage.local.set({
       [CS_CACHE_KEY]: {
@@ -209,12 +197,8 @@ async function refreshContentSafetyDB() {
         },
       },
     });
-
-    console.log(
-      `[Iris] Content safety DB refreshed: +${added} new domains (merged ${Object.keys(parsed).length}: adult ${Object.keys(adultMap).length}, gambling ${Object.keys(gambleMap).length}, scam ${Object.keys(scamMap).length})`
-    );
-  } catch (err) {
-    console.warn("[Iris] Content safety refresh failed:", err.message);
+  } catch {
+    // 静默降级
   }
 }
 
@@ -227,6 +211,47 @@ async function getCSMeta() {
     dynamicCount: cache.count || 0,
     breakdown: cache.breakdown || null,
   };
+}
+
+function computeAiSourcesRating(sources) {
+  if (!sources || sources.length === 0) return "green";
+  if (sources.some((s) => s.tier === "low")) return "red";
+  if (sources.some((s) => s.tier === "caution")) return "yellow";
+  return "green";
+}
+
+/**
+ * AI 回答引用域名可信度（v1.3）：启发式，非判决。
+ * low：内容安全库高危类；caution：暴力类、高侵入追踪器或静态「薄内容」列表。
+ */
+function scoreCitationDomain(hostname) {
+  const reasons = [];
+  let tier = "ok";
+
+  const cs = matchContentSafety(hostname);
+  if (cs) {
+    if (["Adult", "Gambling", "Scam", "Extreme"].includes(cs.category)) {
+      tier = "low";
+      reasons.push({ kind: "contentSafety", category: cs.category });
+    } else if (cs.category === "Violence") {
+      tier = "caution";
+      reasons.push({ kind: "contentSafety", category: cs.category });
+    }
+  }
+
+  const tr = matchTracker(hostname);
+  if (tr && ["Fingerprinting", "Data Broker", "Session Recording"].includes(tr.category)) {
+    if (tier === "ok") tier = "caution";
+    reasons.push({ kind: "tracker", category: tr.category });
+  }
+
+  const cit = matchCitationLowTrust(hostname);
+  if (cit && tier !== "low") {
+    if (tier === "ok") tier = "caution";
+    reasons.push({ kind: "citationList", key: cit.reasonKey });
+  }
+
+  return { tier, reasons };
 }
 
 function computeContentSafetyRating(cs) {
@@ -297,11 +322,13 @@ function getTabData(tabId) {
       aiCalls:  [],        // AI 服务调用记录
       totalRequests: 0,
       timestamp: Date.now(),
+      aiSearchSources: null,
       contentSafety: {
         domainMatches: [],
         keywords: [],
         manipulation: [],
       },
+      subscriptionGuard: null,
     });
   }
   return tabData.get(tabId);
@@ -433,6 +460,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             keywords: [],
             manipulation: [],
           },
+          aiSearchSources: null,
+          subscriptionGuard: null,
           csMeta: await getCSMeta(),
         });
       }
@@ -469,6 +498,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         manipulation: cs.manipulation,
       };
 
+      let aiSearchSources = null;
+      if (data.aiSearchSources && Array.isArray(data.aiSearchSources.sources)) {
+        const sources = data.aiSearchSources.sources;
+        aiSearchSources = {
+          sources,
+          updatedAt: data.aiSearchSources.updatedAt,
+          rating: computeAiSourcesRating(sources),
+          counts: {
+            total: sources.length,
+            low: sources.filter((s) => s.tier === "low").length,
+            caution: sources.filter((s) => s.tier === "caution").length,
+            ok: sources.filter((s) => s.tier === "ok").length,
+          },
+        };
+      }
+
+      let subscriptionGuard = null;
+      const rawSg = data.subscriptionGuard;
+      if (rawSg && typeof rawSg === "object") {
+        const hits = Array.isArray(rawSg.hits) ? rawSg.hits : [];
+        const gatePassed = !!rawSg.gatePassed;
+        subscriptionGuard = {
+          gatePassed,
+          gateReason: rawSg.gateReason || null,
+          hits,
+          updatedAt: rawSg.updatedAt || null,
+          rating: gatePassed ? (hits.length > 0 ? "yellow" : "green") : "neutral",
+        };
+      }
+
       // 每次 popup 拉取时都同步 badge，防止 service worker 休眠后 badge 残留
       updateBadge(tabs[0].id, data);
 
@@ -481,6 +540,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         dbMeta,
         csMeta,
         contentSafety,
+        aiSearchSources,
+        subscriptionGuard,
         url: tabUrl
       });
     });
@@ -532,5 +593,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const dup = cs.manipulation.some((x) => x.type === m.type && x.hint === m.hint);
       if (!dup) cs.manipulation.push(m);
     }
+  }
+
+  if (message.type === "AI_SEARCH_SOURCES" && sender.tab) {
+    const hosts = Array.isArray(message.hosts) ? message.hosts : [];
+    const sources = hosts.map((hostname) => ({
+      hostname,
+      ...scoreCitationDomain(hostname),
+    }));
+    const data = getTabData(sender.tab.id);
+    data.aiSearchSources = {
+      sources,
+      updatedAt: Date.now(),
+    };
+  }
+
+  if (message.type === "SUBSCRIPTION_SCAN" && sender.tab) {
+    const seen = new Set();
+    const hits = [];
+    for (const h of message.hits || []) {
+      if (h && h.id && !seen.has(h.id)) {
+        seen.add(h.id);
+        hits.push({ id: h.id });
+      }
+    }
+    const data = getTabData(sender.tab.id);
+    data.subscriptionGuard = {
+      gatePassed: !!message.gatePassed,
+      gateReason: message.gateReason || null,
+      hits,
+      updatedAt: Date.now(),
+    };
   }
 });

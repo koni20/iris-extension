@@ -323,4 +323,163 @@
 
   scheduleContentSafetyScan();
 
+  // ── v1.4：消费与订阅信号（收窄场景，主世界可见文本）──────────────────────────
+  const SUB_URL_KEYS = [
+    "checkout", "pricing", "subscribe", "subscription", "trial", "payment", "cart",
+    "order", "billing", "membership", "vip", "renew",
+    "signup", "sign-up", "register", "upgrade", "plan", "plans", "purchase",
+    "buy", "offer", "deals", "开通", "付费", "充值", "会员", "订阅",
+  ];
+
+  function subscriptionUrlGate() {
+    const u = (location.pathname + location.search + location.hash).toLowerCase();
+    return SUB_URL_KEYS.some((k) => u.includes(k));
+  }
+
+  function subscriptionCheckoutFormGate() {
+    const cc = document.querySelector(
+      'input[autocomplete="cc-number"], input[autocomplete="cc-exp"], input[name*="cardnumber" i], input[id*="cardnumber" i], input[placeholder*="card number" i]'
+    );
+    const pw = document.querySelector('input[type="password"]');
+    return !!(cc && pw);
+  }
+
+  function collectSubscriptionHits(text) {
+    const hits = [];
+    const add = (id) => {
+      if (!hits.some((h) => h.id === id)) hits.push({ id });
+    };
+
+    const lower = text.toLowerCase();
+
+    const trialZh = /免费试用|免費試用|(?:^|[^\w\u4e00-\u9fff])试用(?:期)?|試用/.test(text);
+    const trialEn = /\bfree\s*trial\b/i.test(lower);
+    const payZh = /支付|付款|信用卡|银行卡|支付宝|微信支付|绑定(?:银行卡)?|付款方式/;
+    const payEn =
+      /payment\s*method|credit\s*card|debit\s*card|card\s*number|\bbilling\b|\bsubscribe\s+with/i.test(lower);
+
+    if ((trialZh || trialEn) && (payZh.test(text) || payEn)) add("subSig_trial_payment");
+
+    if (/自动续订|自动续费|自動續訂|自動續費|到期(?:自动)?扣款|\bauto[\s\-]?renew/i.test(text)) {
+      add("subSig_auto_renew");
+    }
+
+    if (/\bcancel\s*anytime\b/i.test(lower) && /\b(subscription|renew|trial|billing|membership)\b/i.test(lower)) {
+      add("subSig_cancel_framing");
+    }
+
+    if (
+      /(?:首月|第一个月|首\s*\d+\s*个月|first\s*(?:month|months?))\s*[^\n]{0,60}(?:\$|￥|£|€|\d+\s*(?:元|美金|美元)?)/i.test(
+        text
+      ) &&
+      /(?:然后|之后|此后|then|after|\/\s*month|每月|\/mo\b|per\s*month)/i.test(text)
+    ) {
+      add("subSig_price_intro");
+    }
+
+    if (
+      /(?:仅需|只需|低至)?\s*[\d.,]+\s*(?:元|\$|usd)?\s*\/\s*(?:天|day)\b/i.test(text) &&
+      /(?:subscribe|trial|plan|会员|订阅)/i.test(text)
+    ) {
+      add("subSig_daily_equiv");
+    }
+
+    if (
+      /\bmonthly\s*price\b/i.test(lower) &&
+      /(?:\$|€|£|￥|¥|cny|usd|eur)\s*\d|\d\s*(?:\$|€|£|￥|¥)/i.test(text)
+    ) {
+      add("subSig_monthly_pricing");
+    }
+
+    if (
+      /(?:月费|月付|每月|\/月|按月)/i.test(text) &&
+      /\d+\s*(?:元|¥|￥)/i.test(text)
+    ) {
+      add("subSig_monthly_pricing");
+    }
+
+    return hits;
+  }
+
+  function postSubscriptionScan(payload) {
+    try {
+      window.postMessage(
+        {
+          __uncloak: true,
+          api: "subscription-scan",
+          detail: JSON.stringify(payload),
+        },
+        "*"
+      );
+    } catch (e) {}
+  }
+
+  let subScanTimer = null;
+  function runSubscriptionScanOnce() {
+    try {
+      const urlOk = subscriptionUrlGate();
+      const formOk = subscriptionCheckoutFormGate();
+      if (!urlOk && !formOk) {
+        postSubscriptionScan({ gatePassed: false, gateReason: null, hits: [] });
+        return;
+      }
+      ensureSubObserver();
+      const gateReason = urlOk ? "url" : "checkout_form";
+      const root = document.body;
+      if (!root) return;
+      const text = (root.innerText || "").slice(0, 100000);
+      const hits = text.length >= 24 ? collectSubscriptionHits(text) : [];
+      postSubscriptionScan({ gatePassed: true, gateReason, hits });
+    } catch (e) {}
+  }
+
+  function scheduleSubscriptionRescan() {
+    clearTimeout(subScanTimer);
+    subScanTimer = setTimeout(runSubscriptionScanOnce, 450);
+  }
+
+  let subObs = null;
+  function ensureSubObserver() {
+    if (subObs) return;
+    if (!subscriptionUrlGate() && !subscriptionCheckoutFormGate()) return;
+    subObs = new MutationObserver(() => scheduleSubscriptionRescan());
+    subObs.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function scheduleSubscriptionScan() {
+    function hookHistory() {
+      const hook = (name) => {
+        const orig = history[name];
+        if (typeof orig !== "function") return;
+        history[name] = function () {
+          const r = orig.apply(this, arguments);
+          scheduleSubscriptionRescan();
+          return r;
+        };
+      };
+      hook("pushState");
+      hook("replaceState");
+      window.addEventListener("popstate", scheduleSubscriptionRescan);
+    }
+
+    function boot() {
+      if (!document.body) {
+        setTimeout(boot, 400);
+        return;
+      }
+      hookHistory();
+      runSubscriptionScanOnce();
+      setTimeout(runSubscriptionScanOnce, 3200);
+      setTimeout(runSubscriptionScanOnce, 7500);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
+    } else {
+      setTimeout(boot, 900);
+    }
+  }
+
+  scheduleSubscriptionScan();
+
 })();

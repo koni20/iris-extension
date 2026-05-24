@@ -4,3 +4,5 @@
 node_modules/
 .env
 iris-extension/
+docs/
+sspai-article-v2.md

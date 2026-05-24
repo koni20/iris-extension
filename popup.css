@@ -13,9 +13,9 @@
   --green:   #059669;
   --blue:    #2563eb;
   --purple:  #7c3aed;
-  --font:    'DM Sans', sans-serif;
-  --mono:    'DM Mono', monospace;
-  --display: 'Syne', sans-serif;
+  --font:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono:    ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  --display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --shadow:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
 }
@@ -537,6 +537,89 @@ body {
   line-height: 1.5;
 }
 
+/* ── AI 引用来源分析（v1.3）────────────────────────────────────────────────── */
+.ai-sources-wrap {
+  padding-bottom: 6px;
+}
+
+.ai-sources-wrap .ai-sources-summary {
+  margin-top: 8px;
+}
+
+.ai-sources-disclaimer {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.ai-sources-empty {
+  margin: 10px 14px;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--s2);
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+}
+
+.ai-source-row {
+  margin: 6px 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--s1);
+  font-size: 11.5px;
+}
+
+.ai-source-row.tier-low {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.ai-source-row.tier-caution {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.ai-source-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-source-tier {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.ai-source-row.tier-low .ai-source-tier {
+  color: #991b1b;
+}
+
+.ai-source-row.tier-caution .ai-source-tier {
+  color: #b45309;
+}
+
+.ai-source-host {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.ai-source-reasons {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: #555570;
+  line-height: 1.45;
+}
+
 .hidden { display: none !important; }
 
 /* ── Content Safety (v1.2) ─────────────────────────────────────────────────── */
@@ -564,6 +647,11 @@ body {
 .cs-rating-red {
   border-color: #fecaca;
   background: #fff5f5;
+}
+
+.cs-rating-neutral {
+  border-color: #e5e7eb;
+  background: #f9fafb;
 }
 
 .cs-rating-icon {
