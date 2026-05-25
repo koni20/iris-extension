@@ -539,10 +539,9 @@
 
   scheduleSubscriptionScan();
 
-})();
-
-// ── v1.5：Cookie 同意暗模式检测 ───────────────────────────────────────────────
-(function setupCookieConsentScanner() {
+  // ── v1.5：Cookie 同意暗模式检测 ─────────────────────────────────────────────
+  // 注意：必须在主 IIFE 内部，才能访问 report() 函数
+  (function setupCookieConsentScanner() {
   // 已知 CMP 框架检测
   const CMP_CHECKS = {
     OneTrust:    () => !!(window.OneTrust    || document.getElementById("onetrust-banner-sdk")),
@@ -647,4 +646,6 @@
   new MutationObserver(debouncedScan).observe(document.documentElement, {
     childList: true, subtree: true,
   });
-})();
+  })(); // end setupCookieConsentScanner
+
+})(); // end main IIFE
