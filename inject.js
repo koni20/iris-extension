@@ -328,7 +328,11 @@
     "checkout", "pricing", "subscribe", "subscription", "trial", "payment", "cart",
     "order", "billing", "membership", "vip", "renew",
     "signup", "sign-up", "register", "upgrade", "plan", "plans", "purchase",
-    "buy", "offer", "deals", "开通", "付费", "充值", "会员", "订阅",
+    "buy", "offer", "deals",
+    // 中文 URL 关键词
+    "开通", "付费", "充值", "会员", "订阅", "套餐", "续费", "年费", "购买",
+    // 日文 URL 关键词
+    "購入", "料金", "プラン", "定期", "定期購入", "申込",
   ];
 
   function subscriptionUrlGate() {
@@ -360,19 +364,38 @@
 
     if ((trialZh || trialEn) && (payZh.test(text) || payEn)) add("subSig_trial_payment");
 
-    if (/自动续订|自动续费|自動續訂|自動續費|到期(?:自动)?扣款|\bauto[\s\-]?renew/i.test(text)) {
+    if (
+      /自动续订|自动续费|自動續訂|自動續費|到期(?:自动)?扣款|连续包月|连续包年|自动扣费|自动扣款|\bauto[\s\-]?renew/i.test(text) ||
+      /自動更新|自動課金|継続課金|定期購入|自動的に課金|毎月自動/i.test(text)
+    ) {
       add("subSig_auto_renew");
     }
 
-    if (/\bcancel\s*anytime\b/i.test(lower) && /\b(subscription|renew|trial|billing|membership)\b/i.test(lower)) {
+    if (
+      (/\bcancel\s*anytime\b/i.test(lower) && /\b(subscription|renew|trial|billing|membership)\b/i.test(lower)) ||
+      (/随时取消|随时退订|随时退款|随时终止|随时解约/i.test(text) && /会员|订阅|服务|续费/i.test(text)) ||
+      (/いつでも解約|いつでもキャンセル|いつでも退会/i.test(text) && /プラン|会員|サービス|定期/i.test(text))
+    ) {
       add("subSig_cancel_framing");
     }
 
     if (
-      /(?:首月|第一个月|首\s*\d+\s*个月|first\s*(?:month|months?))\s*[^\n]{0,60}(?:\$|￥|£|€|\d+\s*(?:元|美金|美元)?)/i.test(
-        text
-      ) &&
-      /(?:然后|之后|此后|then|after|\/\s*month|每月|\/mo\b|per\s*month)/i.test(text)
+      (
+        /(?:首月|第一个月|首\s*\d+\s*个月|first\s*(?:month|months?))\s*[^\n]{0,60}(?:\$|￥|£|€|\d+\s*(?:元|美金|美元)?)/i.test(text) &&
+        /(?:然后|之后|此后|then|after|\/\s*month|每月|\/mo\b|per\s*month)/i.test(text)
+      ) ||
+      (
+        /(?:前\s*\d+\s*(?:天|日間?|日)|初回|最初の\s*\d+\s*(?:日|ヶ月|か月))\s*[^\n]{0,40}(?:無料|无料|免費|免费)/i.test(text) &&
+        /(?:その後|以降|以后|然后|after)/i.test(text)
+      ) ||
+      (
+        /(?:首年|第一年|活动价)\s*[^\n]{0,60}(?:\$|￥|£|€|\d+\s*(?:元|美金|美元)?)/i.test(text) &&
+        /(?:然后|之后|此后|之后恢复|原价)/i.test(text)
+      ) ||
+      (
+        /初月無料|初月\d+円|最初の\d+(?:日|ヶ月|か月)(?:は)?無料/i.test(text) &&
+        /(?:その後|以降)\s*[^\n]{0,60}(?:円|¥)/i.test(text)
+      )
     ) {
       add("subSig_price_intro");
     }
@@ -384,18 +407,52 @@
       add("subSig_daily_equiv");
     }
 
+    // 日文：1日あたり / 日額
     if (
-      /\bmonthly\s*price\b/i.test(lower) &&
-      /(?:\$|€|£|￥|¥|cny|usd|eur)\s*\d|\d\s*(?:\$|€|£|￥|¥)/i.test(text)
+      /(?:1日|一日)あたり\s*[\d.,]+\s*円/i.test(text) &&
+      /(?:プラン|会員|サービス|サブスク)/i.test(text)
+    ) {
+      add("subSig_daily_equiv");
+    }
+
+    if (
+      (
+        /\bmonthly\s*price\b/i.test(lower) &&
+        /(?:\$|€|£|￥|¥|cny|usd|eur)\s*\d|\d\s*(?:\$|€|£|￥|¥)/i.test(text)
+      ) ||
+      (
+        /(?:月费|月付|每月|\/月|按月)/i.test(text) &&
+        /\d+\s*(?:元|¥|￥)/i.test(text)
+      ) ||
+      (
+        /月額\s*[\d,]+\s*円|毎月\s*[\d,]+\s*円|月\s*[\d,]+\s*円\s*(?:から|〜)/i.test(text) &&
+        /(?:プラン|会員|定期|サービス)/i.test(text)
+      )
     ) {
       add("subSig_monthly_pricing");
     }
 
+    // ── 中文：限时优惠 + 价格信号 ──────────────────────────────────────────
     if (
-      /(?:月费|月付|每月|\/月|按月)/i.test(text) &&
-      /\d+\s*(?:元|¥|￥)/i.test(text)
+      /限时(?:优惠|特惠|折扣|活动)|限時(?:優惠|特惠|折扣)|限时抢购|倒计时优惠/i.test(text) &&
+      /\d+\s*(?:元|¥|￥|\$)|会员|订阅|开通/i.test(text)
     ) {
-      add("subSig_monthly_pricing");
+      add("subSig_urgency_discount");
+    }
+
+    // ── 日文：限定価格 / キャンペーン + 価格信号 ───────────────────────────
+    if (
+      /期間限定|今だけ|特別価格|キャンペーン価格|割引キャンペーン/i.test(text) &&
+      /[\d,]+\s*円|月額|プラン|会員/i.test(text)
+    ) {
+      add("subSig_urgency_discount");
+    }
+
+    // ── 日文：無料試用 + 支払情報入力 ────────────────────────────────────────
+    const trialJa = /無料トライアル|無料体験|初回無料|お試し無料/i.test(text);
+    const payJa = /クレジットカード|デビットカード|お支払い方法|カード番号|クレカ/i.test(text);
+    if (trialJa && payJa) {
+      add("subSig_trial_payment");
     }
 
     return hits;
