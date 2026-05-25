@@ -1,162 +1,40 @@
 # Iris Roadmap
 
-## 当前版本 v1.5.0（开发中）
-- ✅ **导航重构**：Tabs → 可折叠 Section Cards，每个模块独立展开，支持同时查看多个模块，卡片头部实时显示风险状态角标
-- ✅ **Cookie 同意暗模式检测**（新模块）：识别已知 CMP 框架（OneTrust / Cookiebot / TrustArc / Didomi 等），检测「缺少拒绝全部按钮」「非必要项默认勾选」两类暗模式，6 语言支持
-- ✅ v1.4.0 全部能力（AI 引用可信度 + Spend Guard）
+## 当前版本 v1.6.0（最新）
+
+- ✅ **浏览会话汇总栏**：popup 顶部实时显示本次浏览累计数据——追踪器总数、AI 调用次数、低可信引用数，跨 Tab 聚合，给用户全局感知
+- ✅ **用户设置页**：Header 齿轮按钮进入设置面板；6 个模块独立开关（追踪器 / 浏览器 API / AI 安全 / 内容安全 / Spend Guard / Cookie 同意）；Spend Guard 灵敏度选择（标准/严格）；设置持久化至 `chrome.storage.local`
+- ✅ **AI 低可信引用域名库扩充**：citationLowTrust.js 从 9 个扩充至 167 个，分 4 个分类（薄内容 / 阴谋论 / 伪科学 / 假新闻），数据来源 OpenSources (CC BY 4.0)、MBFC、iffy.news (MIT)
+- ✅ **Spend Guard 中日文模式补充**：新增连续包月/包年/自动扣费、随时取消、限时优惠等中文信号；自動更新/自動課金/初月無料/いつでも解約 等日文信号；URL 门控新增中文（套餐/续费）和日文（購入/料金/プラン）关键词
 
 ## 历史版本
 
+### v1.5.0（已发布）
+- ✅ **导航重构**：Tabs → 可折叠 Section Cards，每个模块独立展开，卡片头部实时显示风险角标
+- ✅ **Cookie 同意暗模式检测**（新模块）：识别 OneTrust / Cookiebot / TrustArc / Didomi 等主流 CMP，检测「缺少拒绝按钮」「非必要项默认勾选」两类暗模式，6 语言支持
+
 ### v1.4.0（已上架 Chrome Web Store）
-- ✅ AI 引用来源可信度（v1.3）：在 Perplexity / ChatGPT / Kimi / Gemini 等页面采集引用域名，三维度打分（内容安全库 / 追踪器类型 / 薄内容静态库）
-- ✅ Spend Guard 订阅消费陷阱检测：URL 门控 + 6 类订阅话术模式，新增第五标签页
-- ✅ 安全修复：`esc()` HTML 转义函数，全 innerHTML 注入防护
+- ✅ AI 引用来源可信度（v1.3）：在 Perplexity / ChatGPT / Kimi / Gemini 等页面采集引用域名，三维度评分
+- ✅ Spend Guard 订阅消费陷阱检测：URL 门控 + 多类订阅话术模式
+- ✅ 安全修复：`esc()` HTML 转义，全 innerHTML 注入防护
 - ✅ UI：移除 Google Fonts 外部依赖，改用系统字体栈
 
 ### v1.2.1（已上架 Chrome Web Store）
-- ✅ v1.2 全部能力（内容安全第四标签、本地文本扫描、绿黄红总览）
-- ✅ 内容安全动态库扩展：**uBlock adult** + **StevenBlack 博彩 hosts** + **uBlock badware**
-- ✅ 追踪器 / AI 安全等与 v1.1 一脉相承的能力
+- ✅ 内容安全动态库：uBlock adult + StevenBlack 博彩 hosts + uBlock badware
+- ✅ 追踪器 / AI 安全 / 内容安全（四标签）完整能力
 
 ### 项目近况（2026-05）
 - 商店版已对外可用；GitHub 仓库持续开源协作。
 
 ---
 
-## v1.2.0 — 内容安全（未成年保护）【已发布】
+## 更远期（愿景池）
 
-### 目标
-给 Iris 新增第四个标签页"内容安全"，帮助家长了解当前网站是否适合未成年人访问。
-
-### 产品定位
-- 不是"拦截工具"，是"可观测性工具"——告诉家长发生了什么，而不是强制阻断
-- 完全免费，和 Iris 核心理念一致
-- 目标用户：有孩子的家长，在孩子常用设备上安装
-
-### 功能规划
-
-**功能一：危险域名检测**
-- 数据来源：CleanBrowsing 开源分类列表、uBlock Origin 成人内容规则、Dan Pollock hosts 文件
-- 分类：成人内容 / 赌博 / 诈骗 / 暴力 / 极端内容
-- 和追踪器数据库一样，7天自动更新
-
-**功能二：页面关键词扫描**
-- 在页面可见文本中检测明显的危险关键词
-- 分级：轻度警告 / 中度 / 严重
-- 注意：只检测，不上报，完全本地运行
-
-**功能三：诱导性行为检测**
-- 检测直播打赏引导弹窗
-- 检测过度推送付费内容的行为模式
-- 主要针对中国直播/短视频平台
-
-**功能四：网站内容评级展示**
-- 在 popup 显示当前网站的内容安全等级
-- 绿色：适合所有年龄 / 黄色：建议家长陪同 / 红色：不适合未成年人
-
-### 技术实现
-- 复用现有追踪器数据库框架，新增内容分类字段
-- inject.js 扩展页面文本扫描能力
-- 新增 `contentSafety.js` 数据库文件
-- popup 新增第四个 tab
-
-### 数据来源（全部开源）
-- https://github.com/nicowillis/adult-domains（成人域名）
-- https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/adult.txt
-- https://cleanbrowsing.org/filters（分类 DNS 数据）
-
-### v1.2.1 小版本补充（持续迭代）
-- 动态域名：除 adult.txt 外，合并 [StevenBlack gambling-only hosts](https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts)、[uBlock badware.txt](https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt)（归类诈骗/高风险域名）
-- CleanBrowsing / Dan Pollock 等可作为后续增量数据源
-
-### 发布策略
-- 免费功能，内置在 Iris
-- 发布时重点推给家长群体
-- 少数派已有传播基础，可与「知乎家长圈」等渠道结合二次推广
+- [ ] 历史记录（过去 30 天检测摘要，仅本机存储）
+- [ ] 可分享隐私报告卡片（静态图片生成）
+- [ ] 跨网站百分位对比（方案未定）
+- [ ] 已安装扩展安全审计
 
 ---
 
-## v1.3.0 — 旗舰大版本：反 GEO / AI 搜索引用可信度
-
-> **版本定位**：在 v1.2「家庭内容安全」之外，Iris 的第二条传播主轴——针对 **GEO（Generative Engine Optimization）** 与 **AI 答案引用垃圾站** 的问题，做系统级观测。**这是当前路线图里的下一个「大版本」**，优先于 v1.4 开发资源投入（除非安全类 hotfix）。
-
-### 背景：什么叫 GEO、和 Iris 有什么关系
-GEO（Generative Engine Optimization）是 SEO 的 AI 版，有人专门优化垃圾内容让 AI 搜索优先引用。
-用户看到的是 AI 口吻的答案，无法判断来源是否可靠。
-
-### 目标
-当用户使用 AI 搜索（Perplexity、ChatGPT Search、Kimi 搜索、Gemini 等）时，
-自动检测 AI 回答所引用的来源链接的可信度，帮助用户判断 AI 的答案是否基于可靠内容。
-
-### 功能规划
-
-**核心功能：来源可信度评分**
-- 自动识别 AI 搜索结果页面中的引用来源 URL
-- 对每个来源域名进行可信度评估：
-  - 是否在已知内容农场黑名单中
-  - 是否是新注册域名（< 1年）
-  - 是否有正常的网站结构（非 AI 批量生成站）
-  - 是否在 Iris 追踪器数据库中有记录
-- 在 popup 显示："本次回答引用了 X 个来源，其中 Y 个可信度低"
-
-**支持的 AI 搜索平台**
-- Perplexity AI（perplexity.ai）
-- ChatGPT Search（chatgpt.com）
-- Kimi 搜索（kimi.moonshot.cn）
-- Google Gemini（gemini.google.com）
-- 微软 Copilot（copilot.microsoft.com）
-- 秘塔搜索（metaso.cn）
-
-**可信度数据来源（开源）**
-- 内容农场黑名单：uBlock Origin 的 `uAssets/filters/badware.txt`
-- 域名黑名单：Spamhaus、SURBL
-- 域名年龄：通过 WHOIS 数据判断（需服务端支持）
-
-**UI 展示**
-- AI Safety 标签内新增"搜索来源分析"子区域
-- 绿色：所有来源可信 / 黄色：部分来源存疑 / 红色：多个来源为低可信度站点
-- 点击展开查看每个来源的详细评分
-
-### 技术实现
-- content.js 扫描 AI 搜索结果页面中的 `<a>` 引用链接
-- 提取域名后与可信度数据库匹配
-- 结果通过 background.js 汇总后在 popup 展示
-
-### 市场价值
-- 目前很少有浏览器扩展把「AI 答案里的外链」当作一等公民来做观测
-- GEO 是 2025-2026 年高热话题，「反 GEO」叙事与 Iris「只解释、不代替你判断」一致
-- 传播上适合英文科技圈（Hacker News、博客）与国内 AI 搜索用户教育并行
-
-### v1.3 与非目标（边界）
-- **目标**：引用域名分级、可解释信号、本地优先；可选 WHOIS 等再评估是否引入轻量服务端。
-- **非目标**：不做「替用户断定真假新闻」的裁判；不保证覆盖全部 AI 搜索 UI（各站改版需持续适配）。
-
----
-
-## v1.4.0 — 观测「可回顾、可分享」（规划草案）
-
-> **版本主题**：在「单次打开 popup 看当前页」之上，让用户能 **回顾一段时间内的检测摘要**，并 **低摩擦分享**（仍坚持隐私叙事）。具体范围以开发时的权限与存储评审为准。
-
-### 建议优先级（可在实施前调整）
-
-| 优先级 | 方向 | 说明 |
-|--------|------|------|
-| P0 | **本地历史记录** | 过去 **30 天**（可调）的 tracker / API / 内容安全摘要等，**仅存本机**；需扩展 `storage` 配额与清理策略。 |
-| P1 | **可分享的隐私报告卡片** | 一键生成图片或简短摘要链接（若纯静态图片则无服务端）；便于社交媒体传播。 |
-| P2 | **已安装扩展安全审计** | 利用 `management` 等 API（需新增权限与文案说明）提示可疑或高风险扩展。 |
-
-### 延后 / 独立研究（不默认绑死 v1.4）
-
-- **跨网站对比（百分位）**：若要做「比 xx% 网站更糟」，需要 **匿名聚合数据或本地近似**，否则易引发隐私争议；适合 **v1.5+** 或专项实验。
-- **公开网站隐私排行榜**：依赖社区提交或爬虫与法务评估，**不作为 v1.4 默认交付**。
-
----
-
-## 更远期（v1.5+ / 愿景池）
-
-- [ ] 跨网站对比（百分位）— 方案未定
-- [ ] 公开网站隐私排行榜 — 需产品与合规单独立项
-
----
-
-*最后更新：2026-05-01（明确 v1.3 旗舰定位与 v1.4 草案）*
+*最后更新：2026-05-25*
