@@ -309,6 +309,35 @@ async function getDBMeta() {
   };
 }
 
+// ── 会话累计（内存，service worker 重启时重置）────────────────────────────────
+const sessionTotals = {
+  trackerDomains: new Set(),   // 唯一追踪器域名
+  aiCallCount: 0,              // AI 调用次数（不重复计同域）
+  tabLowTrust: new Map(),      // tabId → 低可信引用数
+};
+
+function getSessionSnapshot() {
+  let lowTrust = 0;
+  for (const n of sessionTotals.tabLowTrust.values()) lowTrust += n;
+  return {
+    trackers: sessionTotals.trackerDomains.size,
+    aiCalls:  sessionTotals.aiCallCount,
+    lowTrustCitations: lowTrust,
+  };
+}
+
+// ── 用户设置 ───────────────────────────────────────────────────────────────────
+const SETTINGS_KEY = "irisSettings";
+const DEFAULT_SETTINGS = {
+  mod_trackers:       true,
+  mod_fingerprinting: true,
+  mod_aiSafety:       true,
+  mod_contentSafety:  true,
+  mod_spendGuard:     true,
+  mod_cookieConsent:  true,
+  spendSensitivity:   "normal",   // "normal" | "strict"
+};
+
 // ── 内存存储：每个 tab 的检测数据 ──────────────────────────────────────────────
 // tabId → { requests: Set, trackers: [], apiCalls: [], timestamp }
 const tabData = new Map();
@@ -361,6 +390,7 @@ chrome.webRequest.onBeforeRequest.addListener(
           ...tracker,
           time: Date.now()
         });
+        sessionTotals.trackerDomains.add(hostname);
         updateBadge(tabId, data);
       }
     }
@@ -442,6 +472,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabData.delete(tabId);
+  sessionTotals.tabLowTrust.delete(tabId);
 });
 
 // ── 消息处理 ────────────────────────────────────────────────────────────────────
@@ -545,7 +576,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         aiSearchSources,
         subscriptionGuard,
         cookieConsent: data.cookieConsent || null,
-        url: tabUrl
+        url: tabUrl,
+        session: getSessionSnapshot(),
       });
     });
     return true;
@@ -560,6 +592,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const service = matchAIService("https://" + message.domain);
       if (service) {
         data.aiCalls.push({ ...service, count: 1, time: Date.now() });
+        sessionTotals.aiCallCount++;
         updateBadge(sender.tab.id, data);
       }
     } else {
@@ -609,6 +642,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sources,
       updatedAt: Date.now(),
     };
+    // 更新本 tab 的低可信引用计数
+    const lowCount = sources.filter((s) => s.tier === "low" || s.tier === "caution").length;
+    if (lowCount > 0) sessionTotals.tabLowTrust.set(sender.tab.id, lowCount);
   }
 
   if (message.type === "SUBSCRIPTION_SCAN" && sender.tab) {
@@ -627,6 +663,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       hits,
       updatedAt: Date.now(),
     };
+  }
+
+  if (message.type === "GET_SETTINGS") {
+    chrome.storage.local.get(SETTINGS_KEY, (stored) => {
+      sendResponse({ ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] || {}) });
+    });
+    return true;
+  }
+
+  if (message.type === "SAVE_SETTINGS") {
+    const safe = {};
+    for (const k of Object.keys(DEFAULT_SETTINGS)) {
+      if (message.settings && k in message.settings) safe[k] = message.settings[k];
+    }
+    chrome.storage.local.set({ [SETTINGS_KEY]: safe }, () => sendResponse({ ok: true }));
+    return true;
   }
 
   if (message.type === "COOKIE_CONSENT_SCAN" && sender.tab) {

@@ -174,6 +174,73 @@ body {
   line-height: 1.5;
 }
 
+/* ── Header right cluster ───────────────────────────────────────────────────── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gear-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--s2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.gear-btn:hover  { background: var(--border); color: var(--text); }
+.gear-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Session bar ────────────────────────────────────────────────────────────── */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 16px;
+  background: var(--s2);
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.session-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.7;
+  margin-right: 2px;
+}
+
+.session-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.session-ico { font-size: 10px; line-height: 1; }
+
+.session-num {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.session-stat.has-alert .session-num { color: var(--amber); }
+.session-sep { color: var(--border); font-size: 12px; }
+
 /* ── Stats ──────────────────────────────────────────────────────────────────── */
 .stats-row {
   display: flex;
@@ -661,6 +728,154 @@ body {
   font-size: 10.5px;
   color: #555570;
   line-height: 1.45;
+}
+
+/* ── Settings Panel (v1.6) ──────────────────────────────────────────────────── */
+.settings-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  min-height: 0;
+}
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  flex-shrink: 0;
+}
+
+.sp-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sp-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--s2);
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-close:hover { background: var(--border); color: var(--text); }
+
+.sp-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.sp-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 16px 5px;
+}
+
+.sp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-radius: 0;
+}
+.sp-row:hover { background: var(--s2); }
+
+.sp-ico { font-size: 15px; line-height: 1; flex-shrink: 0; }
+
+.sp-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+}
+
+/* Toggle switch */
+.tog {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.tog input { opacity: 0; width: 0; height: 0; position: absolute; }
+.tog-sl {
+  position: absolute;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+.tog-sl::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.tog input:checked + .tog-sl { background: var(--accent); }
+.tog input:checked + .tog-sl::before { transform: translateX(16px); }
+
+/* Sensitivity row */
+.sp-row-sens { align-items: flex-start; cursor: default; }
+.sp-row-sens:hover { background: transparent; }
+.sp-sens-wrap { flex: 1; }
+.sp-pill-row { display: flex; gap: 6px; margin: 6px 0 4px; }
+
+.sp-pill {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--s1);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sp-pill:hover { border-color: var(--accent); color: var(--accent); }
+.sp-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sp-sens-desc {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.4;
+  min-height: 14px;
+}
+
+.sp-note {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 10px 16px 4px;
+  opacity: 0.8;
+  text-align: center;
 }
 
 .hidden { display: none !important; }

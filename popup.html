@@ -25,7 +25,10 @@
         <span class="logo-text">Iris</span>
         <div class="logo-dot" id="logoDot"></div>
       </div>
-      <div class="site-badge" id="siteBadge">—</div>
+      <div class="header-right">
+        <div class="site-badge" id="siteBadge">—</div>
+        <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
+      </div>
     </header>
 
     <!-- Verdict -->
@@ -35,6 +38,25 @@
         <div class="verdict-title" id="verdictTitle"></div>
         <div class="verdict-sub" id="verdictSub"></div>
       </div>
+    </div>
+
+    <!-- Session 汇总栏 -->
+    <div class="session-bar" id="sessionBar">
+      <span class="session-label" id="sessionLabel"></span>
+      <span class="session-stat" id="sessTr">
+        <span class="session-ico">🔍</span>
+        <span class="session-num" id="sessTrackers">0</span>
+      </span>
+      <span class="session-sep">·</span>
+      <span class="session-stat" id="sessAi">
+        <span class="session-ico">🤖</span>
+        <span class="session-num" id="sessAiCalls">0</span>
+      </span>
+      <span class="session-sep">·</span>
+      <span class="session-stat" id="sessLt">
+        <span class="session-ico">⚠️</span>
+        <span class="session-num" id="sessLowTrust">0</span>
+      </span>
     </div>
 
     <!-- Stats -->
@@ -65,6 +87,65 @@
       <div class="comp-ends">
         <span id="compEndLeft"></span>
         <span id="compEndRight"></span>
+      </div>
+    </div>
+
+    <!-- 设置面板（v1.6，覆盖 sections 区域）-->
+    <div class="settings-panel hidden" id="settingsPanel">
+      <div class="sp-header">
+        <span class="sp-title" id="spTitle"></span>
+        <button class="sp-close" id="settingsClose">✕</button>
+      </div>
+      <div class="sp-scroll">
+
+        <div class="sp-section-label" id="spLabelModules"></div>
+
+        <label class="sp-row">
+          <span class="sp-ico">🔍</span>
+          <span class="sp-name" id="spMod_trackers"></span>
+          <span class="tog"><input type="checkbox" id="tog_trackers" /><span class="tog-sl"></span></span>
+        </label>
+        <label class="sp-row">
+          <span class="sp-ico">🧬</span>
+          <span class="sp-name" id="spMod_fingerprinting"></span>
+          <span class="tog"><input type="checkbox" id="tog_fingerprinting" /><span class="tog-sl"></span></span>
+        </label>
+        <label class="sp-row">
+          <span class="sp-ico">🤖</span>
+          <span class="sp-name" id="spMod_aiSafety"></span>
+          <span class="tog"><input type="checkbox" id="tog_aiSafety" /><span class="tog-sl"></span></span>
+        </label>
+        <label class="sp-row">
+          <span class="sp-ico">🛡️</span>
+          <span class="sp-name" id="spMod_contentSafety"></span>
+          <span class="tog"><input type="checkbox" id="tog_contentSafety" /><span class="tog-sl"></span></span>
+        </label>
+        <label class="sp-row">
+          <span class="sp-ico">💳</span>
+          <span class="sp-name" id="spMod_spendGuard"></span>
+          <span class="tog"><input type="checkbox" id="tog_spendGuard" /><span class="tog-sl"></span></span>
+        </label>
+        <label class="sp-row">
+          <span class="sp-ico">🍪</span>
+          <span class="sp-name" id="spMod_cookieConsent"></span>
+          <span class="tog"><input type="checkbox" id="tog_cookieConsent" /><span class="tog-sl"></span></span>
+        </label>
+
+        <div class="sp-section-label" id="spLabelSensitivity"></div>
+
+        <div class="sp-row sp-row-sens">
+          <span class="sp-ico">💳</span>
+          <div class="sp-sens-wrap">
+            <div class="sp-name" id="spSensTitle"></div>
+            <div class="sp-pill-row">
+              <button class="sp-pill" id="sensNormal" data-val="normal"></button>
+              <button class="sp-pill" id="sensStrict" data-val="strict"></button>
+            </div>
+            <div class="sp-sens-desc" id="spSensDesc"></div>
+          </div>
+        </div>
+
+        <div class="sp-note" id="spNote"></div>
       </div>
     </div>
 

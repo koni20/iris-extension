@@ -8,6 +8,15 @@ function esc(str) {
     .replace(/'/g, "&#39;");
 }
 
+// ── 用户设置（popup 本地副本）──────────────────────────────────────────────────
+const DEFAULT_SETTINGS = {
+  mod_trackers: true, mod_fingerprinting: true,
+  mod_aiSafety: true, mod_contentSafety: true,
+  mod_spendGuard: true, mod_cookieConsent: true,
+  spendSensitivity: "normal",
+};
+let currentSettings = { ...DEFAULT_SETTINGS };
+
 // ── 初始化静态 UI 文字 ─────────────────────────────────────────────────────────
 document.getElementById("verdictTitle").textContent = t.scanning;
 document.getElementById("verdictSub").textContent   = t.loadingData;
@@ -31,6 +40,9 @@ document.getElementById("emptyContentSub").textContent   = t.csEmptySub;
 document.getElementById("emptySpendTitle").textContent   = t.subEmptyScanningTitle;
 document.getElementById("emptySpendSub").textContent     = t.subEmptyScanningSub;
 
+// session bar 静态文字
+document.getElementById("sessionLabel").textContent = t.sessionLabel || "SESSION";
+
 // ── Section Cards 折叠导航 ────────────────────────────────────────────────────
 function initCards() {
   document.querySelectorAll(".sc-hdr").forEach((hdr) => {
@@ -43,6 +55,85 @@ function initCards() {
   });
 }
 initCards();
+
+// ── 设置面板 ──────────────────────────────────────────────────────────────────
+function initSettingsPanel() {
+  // 静态文字
+  document.getElementById("spTitle").textContent          = t.settingsTitle        || "Settings";
+  document.getElementById("spLabelModules").textContent   = t.settingsModules      || "Modules";
+  document.getElementById("spLabelSensitivity").textContent = t.settingsSensitivity || "Spend Guard";
+  document.getElementById("spMod_trackers").textContent      = t.tabTrackers;
+  document.getElementById("spMod_fingerprinting").textContent = t.tabBrowserAPIs;
+  document.getElementById("spMod_aiSafety").textContent      = t.tabAiSafety;
+  document.getElementById("spMod_contentSafety").textContent = t.tabContentSafety;
+  document.getElementById("spMod_spendGuard").textContent    = t.tabSpendGuard;
+  document.getElementById("spMod_cookieConsent").textContent = t.tabCookieConsent;
+  document.getElementById("spSensTitle").textContent         = t.settingsSensTitle  || "Detection Sensitivity";
+  document.getElementById("sensNormal").textContent          = t.settingsSensNormal || "Normal";
+  document.getElementById("sensStrict").textContent          = t.settingsSensStrict || "Strict";
+  document.getElementById("spNote").textContent              = t.settingsSavedNote  || "Changes saved automatically.";
+
+  // 齿轮按钮
+  document.getElementById("gearBtn").addEventListener("click", () => {
+    const isOpen = !document.getElementById("settingsPanel").classList.contains("hidden");
+    toggleSettings(!isOpen);
+  });
+  document.getElementById("settingsClose").addEventListener("click", () => toggleSettings(false));
+
+  // 模块开关：change 时立即保存
+  ["trackers","fingerprinting","aiSafety","contentSafety","spendGuard","cookieConsent"].forEach((mod) => {
+    document.getElementById("tog_" + mod).addEventListener("change", (e) => {
+      currentSettings["mod_" + mod] = e.target.checked;
+      saveSettings();
+    });
+  });
+
+  // 灵敏度 pill
+  ["sensNormal","sensStrict"].forEach((id) => {
+    document.getElementById(id).addEventListener("click", (e) => {
+      const val = e.currentTarget.dataset.val;
+      currentSettings.spendSensitivity = val;
+      applySensitivityUI(val);
+      saveSettings();
+    });
+  });
+}
+
+function toggleSettings(open) {
+  document.getElementById("settingsPanel").classList.toggle("hidden", !open);
+  document.getElementById("sections").classList.toggle("hidden", open);
+  document.getElementById("gearBtn").classList.toggle("active", open);
+}
+
+function applySettingsToUI() {
+  ["trackers","fingerprinting","aiSafety","contentSafety","spendGuard","cookieConsent"].forEach((mod) => {
+    const el = document.getElementById("tog_" + mod);
+    if (el) el.checked = !!currentSettings["mod_" + mod];
+  });
+  applySensitivityUI(currentSettings.spendSensitivity || "normal");
+}
+
+function applySensitivityUI(val) {
+  document.getElementById("sensNormal").classList.toggle("active", val === "normal");
+  document.getElementById("sensStrict").classList.toggle("active", val === "strict");
+  const descKey = val === "strict" ? "settingsSensStrictDesc" : "settingsSensNormalDesc";
+  document.getElementById("spSensDesc").textContent = t[descKey] || "";
+}
+
+function saveSettings() {
+  chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: currentSettings });
+}
+
+// ── Session 汇总栏渲染 ────────────────────────────────────────────────────────
+function renderSession(session) {
+  if (!session) return;
+  document.getElementById("sessTrackers").textContent  = session.trackers || 0;
+  document.getElementById("sessAiCalls").textContent   = session.aiCalls || 0;
+  document.getElementById("sessLowTrust").textContent  = session.lowTrustCitations || 0;
+
+  const ltEl = document.getElementById("sessLt");
+  if (ltEl) ltEl.classList.toggle("has-alert", (session.lowTrustCitations || 0) > 0);
+}
 
 // ── 更新 section card 头部状态和角标 ──────────────────────────────────────────
 function updateCard(key, { dot = "", badge = "", badgeColor = "", findings = false, findingLevel = "" } = {}) {
@@ -157,8 +248,14 @@ function pollData() {
   });
 }
 
-// 首次加载
-fetchAndRender();
+// ── 启动：先加载设置，再初始化面板和数据 ─────────────────────────────────────
+initSettingsPanel();
+
+chrome.storage.local.get("irisSettings", (stored) => {
+  if (stored.irisSettings) Object.assign(currentSettings, stored.irisSettings);
+  applySettingsToUI();
+  fetchAndRender();
+});
 
 // 持续轮询，实时更新
 const pollInterval = setInterval(pollData, 2000);
@@ -400,29 +497,69 @@ function render({
   subscriptionGuard = null,
   cookieConsent = null,
   url,
+  session = null,
 }) {
   renderPhishing(phishing);
   renderDBMeta(dbMeta, csMeta);
-  renderContentSafety(contentSafety || { rating: "green", domainMatches: [], keywords: [], manipulation: [] });
-  renderSpendGuard(subscriptionGuard);
-  renderCookieConsent(cookieConsent);
+  renderSession(session);
+
+  // 各模块按设置决定是否渲染
+  if (currentSettings.mod_contentSafety) {
+    renderContentSafety(contentSafety || { rating: "green", domainMatches: [], keywords: [], manipulation: [] });
+  } else {
+    renderModuleDisabled("Content");
+  }
+
+  if (currentSettings.mod_spendGuard) {
+    renderSpendGuard(subscriptionGuard);
+  } else {
+    renderModuleDisabled("Spend");
+  }
+
+  if (currentSettings.mod_cookieConsent) {
+    renderCookieConsent(cookieConsent);
+  } else {
+    renderModuleDisabled("Cookie");
+  }
 
   let hostname = "—";
   try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch {}
   document.getElementById("siteBadge").textContent = hostname;
 
-  document.getElementById("statTrackers").textContent = trackers.length;
+  const effectiveTrackers = currentSettings.mod_trackers ? trackers : [];
+  const effectiveApis     = currentSettings.mod_fingerprinting ? apiCalls : [];
+
+  document.getElementById("statTrackers").textContent = effectiveTrackers.length;
   document.getElementById("statRequests").textContent = totalRequests;
-  document.getElementById("statApis").textContent = apiCalls.length;
+  document.getElementById("statApis").textContent     = effectiveApis.length;
 
-  const risk = getRiskLevel({ trackers, apiCalls });
-  renderVerdict(risk, trackers, apiCalls);
+  const risk = getRiskLevel({ trackers: effectiveTrackers, apiCalls: effectiveApis });
+  renderVerdict(risk, effectiveTrackers, effectiveApis);
 
-  if (trackers.length > 0) renderComparison(trackers.length);
+  if (effectiveTrackers.length > 0) renderComparison(effectiveTrackers.length);
 
-  renderTrackers(trackers);
-  renderApis(apiCalls);
-  renderAiCalls(aiCalls, aiSearchSources);
+  if (currentSettings.mod_trackers) {
+    renderTrackers(trackers);
+  } else {
+    renderModuleDisabled("Trackers");
+  }
+
+  if (currentSettings.mod_fingerprinting) {
+    renderApis(apiCalls);
+  } else {
+    renderModuleDisabled("Apis");
+  }
+
+  if (currentSettings.mod_aiSafety) {
+    renderAiCalls(aiCalls, aiSearchSources);
+  } else {
+    renderModuleDisabled("Ai");
+  }
+}
+
+// ── 模块已禁用时的卡片状态 ────────────────────────────────────────────────────
+function renderModuleDisabled(key) {
+  updateCard(key, { dot: "", badge: t.moduleDisabledBadge || "Off", badgeColor: "" });
 }
 
 // ── 风险等级判断 ────────────────────────────────────────────────────────────────
