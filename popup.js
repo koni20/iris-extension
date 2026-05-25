@@ -11,11 +11,12 @@ function esc(str) {
 // ── 初始化静态 UI 文字 ─────────────────────────────────────────────────────────
 document.getElementById("verdictTitle").textContent = t.scanning;
 document.getElementById("verdictSub").textContent   = t.loadingData;
-document.getElementById("tabBtnTrackers").textContent = t.tabTrackers;
-document.getElementById("tabBtnApis").textContent     = t.tabBrowserAPIs;
-document.querySelector("#tabBtnAi .ai-tab-label").textContent = t.tabAiSafety;
-document.getElementById("tabBtnContent").textContent  = t.tabContentSafety;
-document.getElementById("tabBtnSpend").textContent    = t.tabSpendGuard;
+document.getElementById("ttlTrackers").textContent  = t.tabTrackers;
+document.getElementById("ttlApis").textContent      = t.tabBrowserAPIs;
+document.getElementById("ttlAi").textContent        = t.tabAiSafety;
+document.getElementById("ttlContent").textContent   = t.tabContentSafety;
+document.getElementById("ttlSpend").textContent     = t.tabSpendGuard;
+document.getElementById("ttlCookie").textContent    = t.tabCookieConsent;
 document.getElementById("emptyTrackersTitle").textContent = t.noTrackersTitle;
 document.getElementById("emptyTrackersSub").textContent   = t.noTrackersSub;
 document.getElementById("emptyApisTitle").textContent     = t.noApisTitle;
@@ -30,20 +31,38 @@ document.getElementById("emptyContentSub").textContent   = t.csEmptySub;
 document.getElementById("emptySpendTitle").textContent   = t.subEmptyScanningTitle;
 document.getElementById("emptySpendSub").textContent     = t.subEmptyScanningSub;
 
-function initTabs() {
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-      tab.classList.add("active");
-      document.getElementById("tabTrackers").classList.toggle("hidden", tab.dataset.tab !== "trackers");
-      document.getElementById("tabApis").classList.toggle("hidden", tab.dataset.tab !== "apis");
-      document.getElementById("tabAi").classList.toggle("hidden", tab.dataset.tab !== "ai");
-      document.getElementById("tabContent").classList.toggle("hidden", tab.dataset.tab !== "content");
-      document.getElementById("tabSpend").classList.toggle("hidden", tab.dataset.tab !== "spend");
+// ── Section Cards 折叠导航 ────────────────────────────────────────────────────
+function initCards() {
+  document.querySelectorAll(".sc-hdr").forEach((hdr) => {
+    hdr.addEventListener("click", () => {
+      const body = hdr.nextElementSibling;
+      const isOpen = body.classList.contains("open");
+      body.classList.toggle("open", !isOpen);
+      hdr.classList.toggle("open", !isOpen);
     });
   });
 }
-initTabs();
+initCards();
+
+// ── 更新 section card 头部状态和角标 ──────────────────────────────────────────
+function updateCard(key, { dot = "", badge = "", badgeColor = "", findings = false, findingLevel = "" } = {}) {
+  const dotEl  = document.getElementById("dot" + key);
+  const bdgEl  = document.getElementById("bdg" + key);
+  const cardEl = document.getElementById("card" + key);
+  if (dotEl) dotEl.className = "sc-dot" + (dot ? " " + dot : "");
+  if (bdgEl) {
+    if (badge) {
+      bdgEl.textContent = badge;
+      bdgEl.className = "sc-bdg" + (badgeColor ? " bdg-" + badgeColor : "");
+    } else {
+      bdgEl.classList.add("hidden");
+    }
+  }
+  if (cardEl) {
+    cardEl.classList.toggle("lvl-red",   findingLevel === "red");
+    cardEl.classList.toggle("lvl-amber", findingLevel === "amber");
+  }
+}
 
 // ── 获取并渲染数据 ─────────────────────────────────────────────────────────────
 function fetchAndRender() {
@@ -75,20 +94,22 @@ function resetToScanning() {
   lastContentSafetyJson = "";
   lastAiSourcesJson = "";
   lastSpendJson = "";
+  lastCookieJson = "";
   const asm = document.getElementById("aiSourcesMount");
   if (asm) asm.innerHTML = "";
   const csSummary = document.getElementById("csSummary");
-  if (csSummary) {
-    csSummary.className = "cs-summary cs-rating-green";
-    csSummary.innerHTML = "";
-  }
+  if (csSummary) { csSummary.className = "cs-summary cs-rating-green"; csSummary.innerHTML = ""; }
   const spendSummary = document.getElementById("spendSummary");
-  if (spendSummary) {
-    spendSummary.className = "cs-summary cs-rating-green";
-    spendSummary.innerHTML = "";
-  }
+  if (spendSummary) { spendSummary.className = "cs-summary cs-rating-neutral"; spendSummary.innerHTML = ""; }
   document.getElementById("spendList").innerHTML = "";
   document.getElementById("emptySpend").classList.add("hidden");
+  const cookieSummary = document.getElementById("cookieSummary");
+  if (cookieSummary) { cookieSummary.className = "cs-summary cs-rating-neutral"; cookieSummary.innerHTML = ""; }
+  document.getElementById("cookieList").innerHTML = "";
+  // 重置所有 card 角标
+  ["Trackers","Apis","Ai","Content","Spend","Cookie"].forEach((k) => {
+    updateCard(k, { dot: "", badge: "" });
+  });
 }
 
 // ── 监听来自 background 的 Tab 变化通知 ──────────────────────────────────────
@@ -108,25 +129,29 @@ let lastApiCount = -1;
 let lastContentSafetyJson = "";
 let lastAiSourcesJson = "";
 let lastSpendJson = "";
+let lastCookieJson = "";
 
 function pollData() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
     if (chrome.runtime.lastError || !data) return;
-    const csJson = JSON.stringify(data.contentSafety || {});
-    const asJson = JSON.stringify(data.aiSearchSources || null);
-    const spendJson = JSON.stringify(data.subscriptionGuard || null);
+    const csJson     = JSON.stringify(data.contentSafety || {});
+    const asJson     = JSON.stringify(data.aiSearchSources || null);
+    const spendJson  = JSON.stringify(data.subscriptionGuard || null);
+    const cookieJson = JSON.stringify(data.cookieConsent || null);
     const changed =
       data.trackers.length !== lastTrackerCount ||
       data.apiCalls.length !== lastApiCount ||
-      csJson !== lastContentSafetyJson ||
-      asJson !== lastAiSourcesJson ||
-      spendJson !== lastSpendJson;
+      csJson    !== lastContentSafetyJson ||
+      asJson    !== lastAiSourcesJson     ||
+      spendJson !== lastSpendJson         ||
+      cookieJson !== lastCookieJson;
     if (changed) {
-      lastTrackerCount = data.trackers.length;
-      lastApiCount = data.apiCalls.length;
+      lastTrackerCount      = data.trackers.length;
+      lastApiCount          = data.apiCalls.length;
       lastContentSafetyJson = csJson;
-      lastAiSourcesJson = asJson;
-      lastSpendJson = spendJson;
+      lastAiSourcesJson     = asJson;
+      lastSpendJson         = spendJson;
+      lastCookieJson        = cookieJson;
       render(data);
     }
   });
@@ -267,6 +292,15 @@ function renderContentSafety(cs) {
     `;
     list.appendChild(div);
   }
+
+  // 更新 card 角标
+  if (rating === "red") {
+    updateCard("Content", { dot: "red", badge: t.csRating_redTitle || "Flagged", badgeColor: "red", findingLevel: "red" });
+  } else if (rating === "yellow") {
+    updateCard("Content", { dot: "amber", badge: t.csRating_yellowTitle || "Caution", badgeColor: "amber", findingLevel: "amber" });
+  } else {
+    updateCard("Content", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+  }
 }
 
 function renderSpendGuard(subscriptionGuard) {
@@ -288,6 +322,7 @@ function renderSpendGuard(subscriptionGuard) {
     `;
     list.innerHTML = "";
     empty.classList.add("hidden");
+    updateCard("Spend", { dot: "", badge: "—" });
     return;
   }
 
@@ -306,6 +341,7 @@ function renderSpendGuard(subscriptionGuard) {
     `;
     list.innerHTML = "";
     empty.classList.add("hidden");
+    updateCard("Spend", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
     return;
   }
 
@@ -321,6 +357,7 @@ function renderSpendGuard(subscriptionGuard) {
     `;
     list.innerHTML = "";
     empty.classList.add("hidden");
+    updateCard("Spend", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
     return;
   }
 
@@ -345,6 +382,9 @@ function renderSpendGuard(subscriptionGuard) {
     list.appendChild(div);
   }
   empty.classList.add("hidden");
+
+  // 更新 card 角标
+  updateCard("Spend", { dot: "amber", badge: String(hits.length), badgeColor: "amber", findingLevel: "amber" });
 }
 
 function render({
@@ -358,58 +398,31 @@ function render({
   contentSafety = null,
   aiSearchSources = null,
   subscriptionGuard = null,
+  cookieConsent = null,
   url,
 }) {
-  // 钓鱼警告（最优先渲染）
   renderPhishing(phishing);
-
-  // 数据库状态
   renderDBMeta(dbMeta, csMeta);
-
   renderContentSafety(contentSafety || { rating: "green", domainMatches: [], keywords: [], manipulation: [] });
-
   renderSpendGuard(subscriptionGuard);
+  renderCookieConsent(cookieConsent);
 
-  // 站点名
   let hostname = "—";
   try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch {}
   document.getElementById("siteBadge").textContent = hostname;
 
-  // 统计数字
   document.getElementById("statTrackers").textContent = trackers.length;
   document.getElementById("statRequests").textContent = totalRequests;
   document.getElementById("statApis").textContent = apiCalls.length;
 
-  // 风险等级
   const risk = getRiskLevel({ trackers, apiCalls });
   renderVerdict(risk, trackers, apiCalls);
 
-  // 比较条：只在有追踪器时显示（0 追踪器没有对比意义）
-  if (trackers.length > 0) {
-    renderComparison(trackers.length);
-  }
+  if (trackers.length > 0) renderComparison(trackers.length);
 
-  // 追踪器列表
   renderTrackers(trackers);
-
-  // API 调用列表
   renderApis(apiCalls);
-
-  // AI 调用列表 + 引用来源（v1.3）
   renderAiCalls(aiCalls, aiSearchSources);
-
-  // AI badge
-  const aiBadge = document.getElementById("aiBadge");
-  const citeLow =
-    aiSearchSources && aiSearchSources.counts ? aiSearchSources.counts.low + aiSearchSources.counts.caution : 0;
-  const badgeN = aiCalls.length > 0 ? aiCalls.length : citeLow > 0 ? citeLow : 0;
-  if (badgeN > 0) {
-    aiBadge.textContent = String(badgeN);
-    aiBadge.classList.remove("hidden");
-  } else {
-    aiBadge.classList.add("hidden");
-  }
-
 }
 
 // ── 风险等级判断 ────────────────────────────────────────────────────────────────
@@ -552,6 +565,15 @@ function renderTrackers(trackers) {
     item.addEventListener("click", () => item.classList.toggle("expanded"));
     list.appendChild(item);
   });
+
+  // 更新 card 角标
+  if (trackers.length > 0) {
+    const hasCritical = trackers.some((tr) => ["Session Recording", "Data Broker", "Fingerprinting"].includes(tr.category));
+    const lvl = (hasCritical || trackers.length > 5) ? "red" : "amber";
+    updateCard("Trackers", { dot: lvl, badge: String(trackers.length), badgeColor: lvl, findingLevel: lvl });
+  } else {
+    updateCard("Trackers", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+  }
 }
 
 function formatAiSourceReason(r) {
@@ -628,6 +650,18 @@ function renderAiSearchSources(aiSearchSources) {
 // ── 渲染 AI 调用列表 ────────────────────────────────────────────────────────────
 function renderAiCalls(aiCalls, aiSearchSources) {
   renderAiSearchSources(aiSearchSources);
+
+  // 更新 card 角标
+  const citeLow = aiSearchSources?.counts
+    ? aiSearchSources.counts.low + aiSearchSources.counts.caution
+    : 0;
+  if (citeLow > 0) {
+    updateCard("Ai", { dot: "amber", badge: String(citeLow), badgeColor: "amber", findingLevel: "amber" });
+  } else if (aiCalls.length > 0) {
+    updateCard("Ai", { dot: "amber", badge: String(aiCalls.length), badgeColor: "amber", findingLevel: "amber" });
+  } else {
+    updateCard("Ai", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+  }
 
   const list  = document.getElementById("aiList");
   const empty = document.getElementById("emptyAi");
@@ -720,6 +754,79 @@ function renderAiCalls(aiCalls, aiSearchSources) {
   });
 }
 
+// ── 渲染 Cookie 同意暗模式（v1.5）──────────────────────────────────────────────
+function renderCookieConsent(cookieConsent) {
+  const summary = document.getElementById("cookieSummary");
+  const list    = document.getElementById("cookieList");
+  if (!summary || !list) return;
+
+  if (!cookieConsent) {
+    summary.className = "cs-summary cs-rating-neutral";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">🍪</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.cookieNeutralTitle || ""}</div>
+        <div class="cs-rating-sub">${t.cookieNeutralSub || ""}</div>
+      </div>
+    `;
+    list.innerHTML = "";
+    updateCard("Cookie", { dot: "", badge: "—" });
+    return;
+  }
+
+  const { vendor, bannerFound, patterns } = cookieConsent;
+  const vendorTag = vendor ? ` · ${esc(vendor)}` : "";
+
+  if (!bannerFound) {
+    summary.className = "cs-summary cs-rating-green";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">🟢</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.cookieGreenTitle || ""}</div>
+        <div class="cs-rating-sub">${t.cookieGreenSub || ""}</div>
+      </div>
+    `;
+    list.innerHTML = "";
+    updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    return;
+  }
+
+  if (!patterns || patterns.length === 0) {
+    summary.className = "cs-summary cs-rating-green";
+    summary.innerHTML = `
+      <div class="cs-rating-icon">🟢</div>
+      <div class="cs-rating-body">
+        <div class="cs-rating-title">${t.cookieBannerCleanTitle || ""}${vendorTag}</div>
+        <div class="cs-rating-sub">${t.cookieBannerCleanSub || ""}</div>
+      </div>
+    `;
+    list.innerHTML = "";
+    updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    return;
+  }
+
+  summary.className = "cs-summary cs-rating-yellow";
+  summary.innerHTML = `
+    <div class="cs-rating-icon">🟡</div>
+    <div class="cs-rating-body">
+      <div class="cs-rating-title">${t.cookieYellowTitle || ""}${vendorTag}</div>
+      <div class="cs-rating-sub">${t.cookieYellowSub || ""}</div>
+    </div>
+  `;
+  list.innerHTML = "";
+  for (const p of patterns) {
+    const div = document.createElement("div");
+    div.className = "cs-item cs-item-manip";
+    const msg = t["cookiePattern_" + p] || p;
+    div.innerHTML = `
+      <div class="cs-item-tag">${esc(t.cookiePatternTag || "Pattern")}</div>
+      <div class="cs-item-plain">${esc(msg)}</div>
+    `;
+    list.appendChild(div);
+  }
+  updateCard("Cookie", { dot: "amber", badge: String(patterns.length), badgeColor: "amber", findingLevel: "amber" });
+}
+
 // ── 渲染 API 调用列表 ──────────────────────────────────────────────────────────
 function renderApis(apiCalls) {
   const list = document.getElementById("apiList");
@@ -756,4 +863,13 @@ function renderApis(apiCalls) {
 
     list.appendChild(item);
   });
+
+  // 更新 card 角标
+  if (apiCalls.length > 0) {
+    const hasHigh = apiCalls.some((a) => a.risk === "high");
+    const lvl = hasHigh ? "red" : "amber";
+    updateCard("Apis", { dot: lvl, badge: String(apiCalls.length), badgeColor: lvl, findingLevel: lvl });
+  } else {
+    updateCard("Apis", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+  }
 }

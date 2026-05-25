@@ -69,6 +69,22 @@
       return;
     }
 
+    if (event.data.api === "cookie-consent-scan") {
+      let detail;
+      try {
+        detail = JSON.parse(event.data.detail || "{}");
+      } catch {
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "COOKIE_CONSENT_SCAN",
+        vendor:      detail.vendor      || null,
+        bannerFound: !!detail.bannerFound,
+        patterns:    Array.isArray(detail.patterns) ? detail.patterns : [],
+      });
+      return;
+    }
+
     const { api } = event.data;
     if (!api || reported.has(api)) return;
 

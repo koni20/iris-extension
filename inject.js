@@ -483,3 +483,111 @@
   scheduleSubscriptionScan();
 
 })();
+
+// ── v1.5：Cookie 同意暗模式检测 ───────────────────────────────────────────────
+(function setupCookieConsentScanner() {
+  // 已知 CMP 框架检测
+  const CMP_CHECKS = {
+    OneTrust:    () => !!(window.OneTrust    || document.getElementById("onetrust-banner-sdk")),
+    Cookiebot:   () => !!(window.Cookiebot   || document.getElementById("CybotCookiebotDialog")),
+    TrustArc:    () => !!(window._truste_api || document.querySelector('[id*="truste"]')),
+    Quantcast:   () => !!(window.__qcCmpapi  || document.querySelector('[id*="qc-cmp"]')),
+    Didomi:      () => !!(window.Didomi      || window.didomiOnReady),
+    Osano:       () => !!window.Osano,
+    Usercentrics:() => !!(window.usercentrics || document.getElementById("usercentrics-root")),
+    Axeptio:     () => !!(window._axcb       || document.querySelector('[id*="axeptio"]')),
+  };
+
+  const BANNER_SELECTORS = [
+    "#onetrust-banner-sdk", "#CybotCookiebotDialog",
+    '[id*="cookie-banner"]', '[id*="cookiebanner"]', '[class*="cookie-banner"]',
+    '[id*="consent-banner"]', '[class*="consent-banner"]',
+    '[id*="gdpr"]', '[class*="gdpr"]',
+    "#cookie-law-info-bar", ".cc-banner", ".cc-window", ".cc-nb",
+    '[id*="cookie-notice"]', '[class*="cookie-notice"]',
+    '[id*="cookie-popup"]', '[class*="cookie-popup"]',
+    '[aria-label*="cookie"]', '[aria-label*="Cookie"]',
+    '[role="dialog"][aria-label*="consent" i]',
+  ];
+
+  const REJECT_TEXT = [
+    /\breject\b/i, /\bdecline\b/i, /\bdeny\b/i, /\brefuse\b/i,
+    /\bnecessary only\b/i, /\bessential only\b/i, /\bopt.?out\b/i,
+    /拒绝|仅必要|拒絕|只接受必要/, /拒否|必要なのみ/,
+    /\bablehnen\b/i, /\bnur notwendige\b/i,
+    /\brefuser\b/i, /\bessentiels uniquement\b/i,
+    /\brechazar\b/i, /\bsolo esenciales\b/i,
+  ];
+
+  function detectVendor() {
+    for (const [name, check] of Object.entries(CMP_CHECKS)) {
+      try { if (check()) return name; } catch {}
+    }
+    return null;
+  }
+
+  function findBanner() {
+    for (const sel of BANNER_SELECTORS) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && el.offsetParent !== null) return el;
+      } catch {}
+    }
+    return null;
+  }
+
+  function hasRejectButton(banner) {
+    const root = banner || document;
+    const btns = root.querySelectorAll('button, a[role="button"], [role="button"]');
+    return Array.from(btns).some((b) => REJECT_TEXT.some((r) => r.test(b.textContent.trim())));
+  }
+
+  function detectPatterns(banner) {
+    const patterns = [];
+    if (banner && !hasRejectButton(banner)) {
+      patterns.push("cookie_no_reject");
+    }
+    const boxes = (banner || document).querySelectorAll('input[type="checkbox"]');
+    const preTicked = Array.from(boxes).filter((c) => {
+      if (!c.checked || c.disabled) return false;
+      const nameId = (c.name + c.id).toLowerCase();
+      return !nameId.includes("necessary") && !nameId.includes("essential") && !nameId.includes("required");
+    });
+    if (preTicked.length > 0) patterns.push("cookie_pre_ticked");
+    return patterns;
+  }
+
+  let lastResult = null;
+
+  function scan() {
+    const vendor     = detectVendor();
+    const banner     = findBanner();
+    const bannerFound = !!(vendor || banner);
+    const patterns   = detectPatterns(banner);
+    const result     = JSON.stringify({ vendor, bannerFound, patterns });
+    if (result === lastResult) return;
+    lastResult = result;
+    report("cookie-consent-scan", result);
+  }
+
+  function debounce(fn, ms) {
+    let id;
+    return (...a) => { clearTimeout(id); id = setTimeout(() => fn(...a), ms); };
+  }
+
+  const debouncedScan = debounce(scan, 900);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      setTimeout(scan, 1200);
+      setTimeout(scan, 3500);
+    });
+  } else {
+    setTimeout(scan, 1200);
+    setTimeout(scan, 3500);
+  }
+
+  new MutationObserver(debouncedScan).observe(document.documentElement, {
+    childList: true, subtree: true,
+  });
+})();

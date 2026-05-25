@@ -329,6 +329,7 @@ function getTabData(tabId) {
         manipulation: [],
       },
       subscriptionGuard: null,
+      cookieConsent: null,
     });
   }
   return tabData.get(tabId);
@@ -462,6 +463,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           },
           aiSearchSources: null,
           subscriptionGuard: null,
+          cookieConsent: null,
           csMeta: await getCSMeta(),
         });
       }
@@ -542,6 +544,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         contentSafety,
         aiSearchSources,
         subscriptionGuard,
+        cookieConsent: data.cookieConsent || null,
         url: tabUrl
       });
     });
@@ -623,6 +626,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       gateReason: message.gateReason || null,
       hits,
       updatedAt: Date.now(),
+    };
+  }
+
+  if (message.type === "COOKIE_CONSENT_SCAN" && sender.tab) {
+    const data = getTabData(sender.tab.id);
+    const patterns = (message.patterns || []).filter(
+      (p) => typeof p === "string" && p.startsWith("cookie_")
+    );
+    data.cookieConsent = {
+      vendor:      message.vendor || null,
+      bannerFound: !!message.bannerFound,
+      patterns,
+      updatedAt:   Date.now(),
     };
   }
 });

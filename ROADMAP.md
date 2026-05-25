@@ -1,16 +1,25 @@
 # Iris Roadmap
 
-## 当前版本 v1.2.1（已上架 Chrome Web Store）
+## 当前版本 v1.5.0（开发中）
+- ✅ **导航重构**：Tabs → 可折叠 Section Cards，每个模块独立展开，支持同时查看多个模块，卡片头部实时显示风险状态角标
+- ✅ **Cookie 同意暗模式检测**（新模块）：识别已知 CMP 框架（OneTrust / Cookiebot / TrustArc / Didomi 等），检测「缺少拒绝全部按钮」「非必要项默认勾选」两类暗模式，6 语言支持
+- ✅ v1.4.0 全部能力（AI 引用可信度 + Spend Guard）
+
+## 历史版本
+
+### v1.4.0（已上架 Chrome Web Store）
+- ✅ AI 引用来源可信度（v1.3）：在 Perplexity / ChatGPT / Kimi / Gemini 等页面采集引用域名，三维度打分（内容安全库 / 追踪器类型 / 薄内容静态库）
+- ✅ Spend Guard 订阅消费陷阱检测：URL 门控 + 6 类订阅话术模式，新增第五标签页
+- ✅ 安全修复：`esc()` HTML 转义函数，全 innerHTML 注入防护
+- ✅ UI：移除 Google Fonts 外部依赖，改用系统字体栈
+
+### v1.2.1（已上架 Chrome Web Store）
 - ✅ v1.2 全部能力（内容安全第四标签、本地文本扫描、绿黄红总览）
-- ✅ 内容安全动态库扩展：**uBlock adult** + **StevenBlack 博彩 hosts** + **uBlock badware**（合并缓存，A/G/S 计数）
-- ✅ 静态补充：`Violence` 示例种子；关键词与诱导规则微调（直播带货 / 粉丝团、降「棋牌游戏」类误报）
+- ✅ 内容安全动态库扩展：**uBlock adult** + **StevenBlack 博彩 hosts** + **uBlock badware**
 - ✅ 追踪器 / AI 安全等与 v1.1 一脉相承的能力
 
 ### 项目近况（2026-05）
-- 商店版已对外可用；GitHub 仓库持续开源协作（欢迎 star / Issue）。
-- 已在少数派发布介绍与更新文章，便于收集真实场景需求。
-- **下一旗舰大版本：v1.3.0 — 反 GEO / AI 搜索引用可信度（见下）**。
-- **再下一档：v1.4.0 — 观测「可回顾、可分享」（记忆与报告向，见文末）**。
+- 商店版已对外可用；GitHub 仓库持续开源协作。
 
 ---
 

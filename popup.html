@@ -8,7 +8,7 @@
 <body>
   <div class="app">
 
-    <!-- 钓鱼警告 Banner（默认隐藏，检测到仿冒 AI 域名时显示） -->
+    <!-- 钓鱼警告 Banner -->
     <div class="phishing-banner hidden" id="phishingBanner">
       <div class="phishing-icon">🚨</div>
       <div class="phishing-body">
@@ -68,76 +68,129 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab active" data-tab="trackers" id="tabBtnTrackers"></button>
-      <button class="tab" data-tab="apis" id="tabBtnApis"></button>
-      <button class="tab" data-tab="ai" id="tabBtnAi">
-        <span class="ai-tab-label"></span>
-        <span class="ai-badge hidden" id="aiBadge"></span>
-      </button>
-      <button class="tab" data-tab="content" id="tabBtnContent"></button>
-      <button class="tab" data-tab="spend" id="tabBtnSpend"></button>
-    </div>
+    <!-- Section Cards (v1.5) -->
+    <div class="sections" id="sections">
 
-    <!-- Tracker List -->
-    <div class="list-section" id="tabTrackers">
-      <div class="empty-state" id="emptyTrackers">
-        <div class="empty-icon">✅</div>
-        <div class="empty-title" id="emptyTrackersTitle"></div>
-        <div class="empty-sub" id="emptyTrackersSub"></div>
+      <!-- Trackers -->
+      <div class="sc" id="cardTrackers">
+        <button class="sc-hdr open" id="hdrTrackers">
+          <span class="sc-dot" id="dotTrackers"></span>
+          <span class="sc-ico">🔍</span>
+          <span class="sc-ttl" id="ttlTrackers"></span>
+          <span class="sc-bdg hidden" id="bdgTrackers"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body open" id="bdyTrackers">
+          <div class="empty-state" id="emptyTrackers">
+            <div class="empty-icon">✅</div>
+            <div class="empty-title" id="emptyTrackersTitle"></div>
+            <div class="empty-sub" id="emptyTrackersSub"></div>
+          </div>
+          <div id="trackerList"></div>
+        </div>
       </div>
-      <div id="trackerList"></div>
-    </div>
 
-    <!-- API Call List -->
-    <div class="list-section hidden" id="tabApis">
-      <div class="empty-state" id="emptyApis">
-        <div class="empty-icon">✅</div>
-        <div class="empty-title" id="emptyApisTitle"></div>
-        <div class="empty-sub" id="emptyApisSub"></div>
+      <!-- Browser APIs -->
+      <div class="sc" id="cardApis">
+        <button class="sc-hdr" id="hdrApis">
+          <span class="sc-dot" id="dotApis"></span>
+          <span class="sc-ico">🧬</span>
+          <span class="sc-ttl" id="ttlApis"></span>
+          <span class="sc-bdg hidden" id="bdgApis"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body" id="bdyApis">
+          <div class="empty-state" id="emptyApis">
+            <div class="empty-icon">✅</div>
+            <div class="empty-title" id="emptyApisTitle"></div>
+            <div class="empty-sub" id="emptyApisSub"></div>
+          </div>
+          <div id="apiList"></div>
+        </div>
       </div>
-      <div id="apiList"></div>
-    </div>
 
-    <!-- AI Safety List -->
-    <div class="list-section hidden" id="tabAi">
-      <div id="aiSourcesMount"></div>
-      <div class="empty-state" id="emptyAi">
-        <div class="empty-icon">🤖</div>
-        <div class="empty-title" id="emptyAiTitle"></div>
-        <div class="empty-sub" id="emptyAiSub"></div>
+      <!-- AI Safety -->
+      <div class="sc" id="cardAi">
+        <button class="sc-hdr" id="hdrAi">
+          <span class="sc-dot" id="dotAi"></span>
+          <span class="sc-ico">🤖</span>
+          <span class="sc-ttl" id="ttlAi"></span>
+          <span class="sc-bdg hidden" id="bdgAi"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body" id="bdyAi">
+          <div id="aiSourcesMount"></div>
+          <div class="empty-state" id="emptyAi">
+            <div class="empty-icon">🤖</div>
+            <div class="empty-title" id="emptyAiTitle"></div>
+            <div class="empty-sub" id="emptyAiSub"></div>
+          </div>
+          <div id="aiList"></div>
+        </div>
       </div>
-      <div id="aiList"></div>
-    </div>
 
-    <!-- Content Safety -->
-    <div class="list-section hidden" id="tabContent">
-      <div class="cs-summary cs-rating-green" id="csSummary"></div>
-      <div class="empty-state hidden" id="emptyContent">
-        <div class="empty-icon">✅</div>
-        <div class="empty-title" id="emptyContentTitle"></div>
-        <div class="empty-sub" id="emptyContentSub"></div>
+      <!-- Content Safety -->
+      <div class="sc" id="cardContent">
+        <button class="sc-hdr" id="hdrContent">
+          <span class="sc-dot" id="dotContent"></span>
+          <span class="sc-ico">🛡️</span>
+          <span class="sc-ttl" id="ttlContent"></span>
+          <span class="sc-bdg hidden" id="bdgContent"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body" id="bdyContent">
+          <div class="cs-summary cs-rating-green" id="csSummary"></div>
+          <div class="empty-state hidden" id="emptyContent">
+            <div class="empty-icon">✅</div>
+            <div class="empty-title" id="emptyContentTitle"></div>
+            <div class="empty-sub" id="emptyContentSub"></div>
+          </div>
+          <div id="contentSafetyList"></div>
+        </div>
       </div>
-      <div id="contentSafetyList"></div>
-    </div>
 
-    <!-- v1.4 Spend & subscription signals -->
-    <div class="list-section hidden" id="tabSpend">
-      <div class="cs-summary cs-rating-green" id="spendSummary"></div>
-      <div class="empty-state hidden" id="emptySpend">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title" id="emptySpendTitle"></div>
-        <div class="empty-sub" id="emptySpendSub"></div>
+      <!-- Spend Guard -->
+      <div class="sc" id="cardSpend">
+        <button class="sc-hdr" id="hdrSpend">
+          <span class="sc-dot" id="dotSpend"></span>
+          <span class="sc-ico">💳</span>
+          <span class="sc-ttl" id="ttlSpend"></span>
+          <span class="sc-bdg hidden" id="bdgSpend"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body" id="bdySpend">
+          <div class="cs-summary cs-rating-neutral" id="spendSummary"></div>
+          <div class="empty-state hidden" id="emptySpend">
+            <div class="empty-icon">🔍</div>
+            <div class="empty-title" id="emptySpendTitle"></div>
+            <div class="empty-sub" id="emptySpendSub"></div>
+          </div>
+          <div id="spendList"></div>
+        </div>
       </div>
-      <div id="spendList"></div>
+
+      <!-- Cookie Consent (v1.5) -->
+      <div class="sc" id="cardCookie">
+        <button class="sc-hdr" id="hdrCookie">
+          <span class="sc-dot" id="dotCookie"></span>
+          <span class="sc-ico">🍪</span>
+          <span class="sc-ttl" id="ttlCookie"></span>
+          <span class="sc-bdg hidden" id="bdgCookie"></span>
+          <span class="sc-chv">›</span>
+        </button>
+        <div class="sc-body" id="bdyCookie">
+          <div class="cs-summary cs-rating-neutral" id="cookieSummary"></div>
+          <div id="cookieList"></div>
+        </div>
+      </div>
+
     </div>
 
     <!-- 底部数据库状态 -->
     <div class="db-footer" id="dbFooter">
       <span class="db-dot" id="dbDot"></span>
       <span id="dbStatus"></span>
-      <a class="db-link" href="https://github.com/koni20/iris-extension" target="_blank" rel="noopener noreferrer" id="dbGithubLink">★ GitHub</a>
+      <a class="db-link" href="https://github.com/koni20/iris-extension" target="_blank" rel="noopener noreferrer">★ GitHub</a>
     </div>
 
   </div>
