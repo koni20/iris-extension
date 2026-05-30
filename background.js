@@ -326,6 +326,36 @@ function getSessionSnapshot() {
   };
 }
 
+// ── 本地历史记录 ───────────────────────────────────────────────────────────────
+const HISTORY_KEY = "irisHistory";
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+async function updateTodayHistory(snapshot) {
+  try {
+    const stored = await chrome.storage.local.get(HISTORY_KEY);
+    let history = stored[HISTORY_KEY] || [];
+    const today = todayStr();
+    const idx = history.findIndex((e) => e.date === today);
+    if (idx >= 0) {
+      history[idx].trackers = Math.max(history[idx].trackers, snapshot.trackers);
+      history[idx].aiCalls  = Math.max(history[idx].aiCalls,  snapshot.aiCalls);
+      history[idx].lowTrust = Math.max(history[idx].lowTrust, snapshot.lowTrustCitations);
+    } else {
+      history.unshift({
+        date:     today,
+        trackers: snapshot.trackers,
+        aiCalls:  snapshot.aiCalls,
+        lowTrust: snapshot.lowTrustCitations,
+      });
+    }
+    history = history.slice(0, 30); // 最多保留 30 天
+    await chrome.storage.local.set({ [HISTORY_KEY]: history });
+  } catch { /* 存储失败静默忽略 */ }
+}
+
 // ── 用户设置 ───────────────────────────────────────────────────────────────────
 const SETTINGS_KEY = "irisSettings";
 const DEFAULT_SETTINGS = {
@@ -564,6 +594,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 每次 popup 拉取时都同步 badge，防止 service worker 休眠后 badge 残留
       updateBadge(tabs[0].id, data);
 
+      const snap = getSessionSnapshot();
+      updateTodayHistory(snap); // 异步写入，不阻塞响应
+
       sendResponse({
         trackers: data.trackers,
         totalRequests: data.totalRequests,
@@ -577,7 +610,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         subscriptionGuard,
         cookieConsent: data.cookieConsent || null,
         url: tabUrl,
-        session: getSessionSnapshot(),
+        session: snap,
       });
     });
     return true;
@@ -663,6 +696,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       hits,
       updatedAt: Date.now(),
     };
+  }
+
+  if (message.type === "GET_HISTORY") {
+    chrome.storage.local.get(HISTORY_KEY, (stored) => {
+      sendResponse(stored[HISTORY_KEY] || []);
+    });
+    return true;
   }
 
   if (message.type === "GET_SETTINGS") {

@@ -75,8 +75,7 @@ function initSettingsPanel() {
 
   // 齿轮按钮
   document.getElementById("gearBtn").addEventListener("click", () => {
-    const isOpen = !document.getElementById("settingsPanel").classList.contains("hidden");
-    toggleSettings(!isOpen);
+    showPanel(_currentPanel === "settings" ? null : "settings");
   });
   document.getElementById("settingsClose").addEventListener("click", () => toggleSettings(false));
 
@@ -99,10 +98,30 @@ function initSettingsPanel() {
   });
 }
 
+// ── 面板切换（settings / history / null）────────────────────────────────────
+let _currentPanel = null;
+
+function showPanel(panel) {
+  _currentPanel = panel;
+  const showSections = panel === null;
+  document.getElementById("settingsPanel").classList.toggle("hidden", panel !== "settings");
+  document.getElementById("historyPanel").classList.toggle("hidden", panel !== "history");
+  document.getElementById("sections").classList.toggle("hidden", !showSections);
+  document.getElementById("gearBtn").classList.toggle("active", panel === "settings");
+  document.getElementById("historyBtn").classList.toggle("active", panel === "history");
+}
+
 function toggleSettings(open) {
-  document.getElementById("settingsPanel").classList.toggle("hidden", !open);
-  document.getElementById("sections").classList.toggle("hidden", open);
-  document.getElementById("gearBtn").classList.toggle("active", open);
+  showPanel(open ? "settings" : null);
+}
+
+function toggleHistory(open) {
+  showPanel(open ? "history" : null);
+  if (open) {
+    chrome.runtime.sendMessage({ type: "GET_HISTORY" }, (entries) => {
+      renderHistory(entries || []);
+    });
+  }
 }
 
 function applySettingsToUI() {
@@ -250,6 +269,7 @@ function pollData() {
 
 // ── 启动：先加载设置，再初始化面板和数据 ─────────────────────────────────────
 initSettingsPanel();
+initHistoryPanel();
 
 chrome.storage.local.get("irisSettings", (stored) => {
   if (stored.irisSettings) Object.assign(currentSettings, stored.irisSettings);
@@ -1009,4 +1029,92 @@ function renderApis(apiCalls) {
   } else {
     updateCard("Apis", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
   }
+}
+
+// ── 历史记录面板（v1.7）──────────────────────────────────────────────────────
+function initHistoryPanel() {
+  document.getElementById("histTitle").textContent = t.historyTitle || "History";
+  document.getElementById("historyBtn").addEventListener("click", () => {
+    showPanel(_currentPanel === "history" ? null : "history");
+    if (_currentPanel === "history") {
+      chrome.runtime.sendMessage({ type: "GET_HISTORY" }, (entries) => {
+        renderHistory(entries || []);
+      });
+    }
+  });
+  document.getElementById("historyClose").addEventListener("click", () => toggleHistory(false));
+}
+
+function renderHistory(entries) {
+  const scroll  = document.getElementById("histScroll");
+  const summary = document.getElementById("histSummary");
+  if (!scroll || !summary) return;
+
+  if (!entries || entries.length === 0) {
+    summary.innerHTML = "";
+    scroll.innerHTML = `
+      <div class="hist-empty">
+        <div class="hist-empty-icon">📊</div>
+        ${esc(t.historyEmpty || "No data yet. Browse some sites and your history will appear here.")}
+      </div>`;
+    return;
+  }
+
+  // 汇总数据
+  const totalTrackers = entries.reduce((s, e) => s + (e.trackers || 0), 0);
+  const totalAi       = entries.reduce((s, e) => s + (e.aiCalls  || 0), 0);
+  const totalLow      = entries.reduce((s, e) => s + (e.lowTrust || 0), 0);
+  summary.innerHTML = `
+    <div class="hist-sum-item">
+      <div class="hist-sum-num">${totalTrackers}</div>
+      <div class="hist-sum-label">🔍 ${esc(t.trackers || "Trackers")}</div>
+    </div>
+    <div class="hist-sum-item">
+      <div class="hist-sum-num">${totalAi}</div>
+      <div class="hist-sum-label">🤖 ${esc(t.aiCalls || "AI Calls")}</div>
+    </div>
+    <div class="hist-sum-item">
+      <div class="hist-sum-num">${totalLow}</div>
+      <div class="hist-sum-label">⚠️ ${esc(t.lowTrust || "Low-Trust")}</div>
+    </div>`;
+
+  const maxTrackers = Math.max(...entries.map((e) => e.trackers || 0), 1);
+  const todayStr    = new Date().toISOString().slice(0, 10);
+  const yestStr     = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayNames    = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const label7  = t.historyLast7  || "Last 7 days";
+  const label30 = t.historyLast30 || "Older";
+
+  let html = `<div class="hist-section-label">${esc(label7)}</div>`;
+  let addedOlderLabel = false;
+
+  entries.forEach((entry, idx) => {
+    if (idx === 7 && !addedOlderLabel) {
+      html += `<div class="hist-section-label">${esc(label30)}</div>`;
+      addedOlderLabel = true;
+    }
+    const barPct  = Math.max(2, Math.round(((entry.trackers || 0) / maxTrackers) * 100));
+    const isToday = entry.date === todayStr;
+    let dateLabel;
+    if (isToday)            dateLabel = t.historyToday     || "Today";
+    else if (entry.date === yestStr) dateLabel = t.historyYesterday || "Yesterday";
+    else {
+      const d = new Date(entry.date + "T12:00:00");
+      dateLabel = dayNames[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate();
+    }
+    const alertClass = (entry.lowTrust || 0) > 0 ? " has-alert" : "";
+    html += `
+      <div class="hist-row${isToday ? " is-today" : ""}">
+        <div class="hist-date">${esc(dateLabel)}</div>
+        <div class="hist-bar-wrap"><div class="hist-bar" style="width:${barPct}%"></div></div>
+        <div class="hist-stats">
+          <span class="hist-stat">🔍 ${entry.trackers || 0}</span>
+          <span class="hist-stat">🤖 ${entry.aiCalls  || 0}</span>
+          <span class="hist-stat${alertClass}">⚠️ ${entry.lowTrust || 0}</span>
+        </div>
+      </div>`;
+  });
+
+  scroll.innerHTML = html;
 }

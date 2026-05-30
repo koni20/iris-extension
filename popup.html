@@ -27,6 +27,7 @@
       </div>
       <div class="header-right">
         <div class="site-badge" id="siteBadge">—</div>
+        <button class="history-btn" id="historyBtn" title="History">📊</button>
         <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
       </div>
     </header>
@@ -88,6 +89,16 @@
         <span id="compEndLeft"></span>
         <span id="compEndRight"></span>
       </div>
+    </div>
+
+    <!-- 历史记录面板（v1.7） -->
+    <div class="history-panel hidden" id="historyPanel">
+      <div class="sp-header">
+        <span class="sp-title" id="histTitle">History</span>
+        <button class="sp-close" id="historyClose">✕</button>
+      </div>
+      <div class="hist-summary" id="histSummary"></div>
+      <div class="hist-scroll" id="histScroll"></div>
     </div>
 
     <!-- 设置面板（v1.6，覆盖 sections 区域）-->
