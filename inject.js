@@ -6,7 +6,28 @@
   if (window.__uncloakInjected) return;
   window.__uncloakInjected = true;
 
+  // ── 接收来自 content.js 的用户设置 ────────────────────────────────────────
+  let __irisSettings = null;
+  window.addEventListener("message", (e) => {
+    if (e.data?.__irisSettings) __irisSettings = e.data.settings || null;
+  });
+
+  // 模块是否启用（未收到设置前默认全部启用）
+  function isMod(key) {
+    return __irisSettings === null || __irisSettings[key] !== false;
+  }
+
+  // 指纹相关 API 集合，用于在 report() 统一拦截
+  const FINGERPRINT_APIS = new Set([
+    "canvas-fingerprint", "webgl-fingerprint", "audio-fingerprint",
+    "geolocation", "media-access", "webrtc-leak", "clipboard-read", "battery-fingerprint",
+  ]);
+
   function report(api, detail) {
+    // 指纹类 API 受 mod_fingerprinting 控制
+    if (FINGERPRINT_APIS.has(api) && !isMod("mod_fingerprinting")) return;
+    // AI 调用受 mod_aiSafety 控制
+    if (api === "ai-api-call" && !isMod("mod_aiSafety")) return;
     window.postMessage({
       __uncloak: true,
       api,
@@ -303,6 +324,7 @@
 
   function scheduleContentSafetyScan() {
     function run() {
+      if (!isMod("mod_contentSafety")) return;
       if (!document.body) {
         setTimeout(run, 400);
         return;
@@ -474,14 +496,21 @@
   let subScanTimer = null;
   function runSubscriptionScanOnce() {
     try {
-      const urlOk = subscriptionUrlGate();
+      // 模块禁用时直接上报空结果
+      if (!isMod("mod_spendGuard")) {
+        postSubscriptionScan({ gatePassed: false, gateReason: null, hits: [] });
+        return;
+      }
+      const sensitivity = __irisSettings?.spendSensitivity || "normal";
+      // strict 模式跳过 URL 门控，扫描所有页面
+      const urlOk  = sensitivity === "strict" || subscriptionUrlGate();
       const formOk = subscriptionCheckoutFormGate();
       if (!urlOk && !formOk) {
         postSubscriptionScan({ gatePassed: false, gateReason: null, hits: [] });
         return;
       }
       ensureSubObserver();
-      const gateReason = urlOk ? "url" : "checkout_form";
+      const gateReason = urlOk ? (sensitivity === "strict" ? "strict_mode" : "url") : "checkout_form";
       const root = document.body;
       if (!root) return;
       const text = (root.innerText || "").slice(0, 100000);
@@ -616,6 +645,7 @@
   let lastResult = null;
 
   function scan() {
+    if (!isMod("mod_cookieConsent")) return;
     const vendor     = detectVendor();
     const banner     = findBanner();
     const bannerFound = !!(vendor || banner);

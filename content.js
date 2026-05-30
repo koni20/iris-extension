@@ -5,7 +5,15 @@
   // ── 注入 inject.js 到页面主世界 ──────────────────────────────────────────────
   const script = document.createElement("script");
   script.src = chrome.runtime.getURL("inject.js");
-  script.onload = () => script.remove();
+  script.onload = () => {
+    script.remove();
+    // 注入完成后立即把用户设置发给 inject.js（通过 postMessage）
+    chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (settings) => {
+      if (settings) {
+        window.postMessage({ __irisSettings: true, settings }, "*");
+      }
+    });
+  };
   (document.head || document.documentElement).appendChild(script);
 
   // ── 接收来自 inject.js 的消息，转发给 background ─────────────────────────────
@@ -104,6 +112,11 @@
 
 // ── v1.3：AI 搜索页引用外链采集（反 GEO / 来源可信度）────────────────────────────
 (function setupAiCitationScanner() {
+  // 检查 mod_aiSafety 是否启用，未收到设置时默认启用
+  let _aiEnabled = true;
+  window.addEventListener("message", (e) => {
+    if (e.data?.__irisSettings) _aiEnabled = e.data.settings?.mod_aiSafety !== false;
+  });
   const ROOT_SUFFIXES = [
     "perplexity.ai",
     "chatgpt.com",
@@ -233,6 +246,7 @@
   }
 
   function pushScan() {
+    if (!_aiEnabled) return;
     if (!hostMatchesSurface(location.hostname)) return;
     const hosts = collectHosts();
     chrome.runtime.sendMessage({ type: "AI_SEARCH_SOURCES", hosts });

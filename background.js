@@ -421,6 +421,12 @@ const DEFAULT_SETTINGS = {
   spendSensitivity:   "normal",   // "normal" | "strict"
 };
 
+// 内存缓存，避免在高频 webRequest 回调里每次读 storage
+let activeSettings = { ...DEFAULT_SETTINGS };
+chrome.storage.local.get(SETTINGS_KEY, (stored) => {
+  if (stored[SETTINGS_KEY]) activeSettings = { ...DEFAULT_SETTINGS, ...stored[SETTINGS_KEY] };
+});
+
 // ── 内存存储：每个 tab 的检测数据 ──────────────────────────────────────────────
 // tabId → { requests: Set, trackers: [], apiCalls: [], timestamp }
 const tabData = new Map();
@@ -451,6 +457,7 @@ function getTabData(tabId) {
 // ── 网络请求监控 ────────────────────────────────────────────────────────────────
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
+    if (!activeSettings.mod_trackers) return;
     const { tabId, url, type } = details;
     if (tabId < 0 || type === "main_frame") return;
 
@@ -793,6 +800,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     for (const k of Object.keys(DEFAULT_SETTINGS)) {
       if (message.settings && k in message.settings) safe[k] = message.settings[k];
     }
+    // 同步更新内存缓存，让 webRequest 等高频路径立即生效
+    activeSettings = { ...DEFAULT_SETTINGS, ...safe };
     chrome.storage.local.set({ [SETTINGS_KEY]: safe }, () => sendResponse({ ok: true }));
     return true;
   }
