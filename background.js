@@ -311,9 +311,14 @@ async function getDBMeta() {
 
 // ── 会话累计（内存，service worker 重启时重置）────────────────────────────────
 const sessionTotals = {
-  trackerDomains: new Set(),   // 唯一追踪器域名
-  aiCallCount: 0,              // AI 调用次数（不重复计同域）
-  tabLowTrust: new Map(),      // tabId → 低可信引用数
+  trackerDomains: new Set(),      // 唯一追踪器域名
+  aiCallCount: 0,                 // AI 调用次数（不重复计同域）
+  tabLowTrust: new Map(),         // tabId → 低可信引用数
+  siteTrackers: new Map(),        // siteHostname → max tracker count
+  siteAiCalls: new Map(),         // siteHostname → ai call count
+  lowTrustPlatforms: new Map(),   // platform hostname → low-trust count
+  spendSites: new Set(),          // 触发 Spend Guard 的站点
+  cookieDarkSites: new Set(),     // 有 Cookie 暗模式的站点
 };
 
 function getSessionSnapshot() {
@@ -324,6 +329,34 @@ function getSessionSnapshot() {
     aiCalls:  sessionTotals.aiCallCount,
     lowTrustCitations: lowTrust,
   };
+}
+
+/** 将 Map 转换为按 count 降序的数组，取前 N 条 */
+function topNFromMap(map, n) {
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([hostname, count]) => ({ hostname, count }));
+}
+
+/** Tab 离开前将该站点数据写入 sessionTotals */
+function recordSiteToSession(data) {
+  const h = data.siteHostname;
+  if (!h) return;
+  if (data.trackers.length > 0) {
+    sessionTotals.siteTrackers.set(h,
+      Math.max(sessionTotals.siteTrackers.get(h) || 0, data.trackers.length));
+  }
+  if (data.aiCalls.length > 0) {
+    sessionTotals.siteAiCalls.set(h,
+      (sessionTotals.siteAiCalls.get(h) || 0) + data.aiCalls.length);
+  }
+  if (data.subscriptionGuard?.hits?.length > 0) {
+    sessionTotals.spendSites.add(h);
+  }
+  if (data.cookieConsent?.patterns?.length > 0) {
+    sessionTotals.cookieDarkSites.add(h);
+  }
 }
 
 // ── 本地历史记录 ───────────────────────────────────────────────────────────────
@@ -339,19 +372,39 @@ async function updateTodayHistory(snapshot) {
     let history = stored[HISTORY_KEY] || [];
     const today = todayStr();
     const idx = history.findIndex((e) => e.date === today);
+
+    const newEntry = {
+      date:              today,
+      trackers:          snapshot.trackers,
+      aiCalls:           snapshot.aiCalls,
+      lowTrust:          snapshot.lowTrustCitations,
+      topSites:          topNFromMap(sessionTotals.siteTrackers, 5),
+      aiSites:           topNFromMap(sessionTotals.siteAiCalls, 5),
+      lowTrustPlatforms: topNFromMap(sessionTotals.lowTrustPlatforms, 3),
+      spendSiteCount:    sessionTotals.spendSites.size,
+      cookieDarkCount:   sessionTotals.cookieDarkSites.size,
+    };
+
     if (idx >= 0) {
-      history[idx].trackers = Math.max(history[idx].trackers, snapshot.trackers);
-      history[idx].aiCalls  = Math.max(history[idx].aiCalls,  snapshot.aiCalls);
-      history[idx].lowTrust = Math.max(history[idx].lowTrust, snapshot.lowTrustCitations);
+      const ex = history[idx];
+      newEntry.trackers       = Math.max(ex.trackers || 0, newEntry.trackers);
+      newEntry.aiCalls        = Math.max(ex.aiCalls  || 0, newEntry.aiCalls);
+      newEntry.lowTrust       = Math.max(ex.lowTrust || 0, newEntry.lowTrust);
+      newEntry.spendSiteCount = Math.max(ex.spendSiteCount || 0, newEntry.spendSiteCount);
+      newEntry.cookieDarkCount= Math.max(ex.cookieDarkCount || 0, newEntry.cookieDarkCount);
+      // site 列表取条目更多的那份（避免 SW 重启后数据变少）
+      if ((ex.topSites?.length || 0) > (newEntry.topSites?.length || 0))
+        newEntry.topSites = ex.topSites;
+      if ((ex.aiSites?.length || 0) > (newEntry.aiSites?.length || 0))
+        newEntry.aiSites = ex.aiSites;
+      if ((ex.lowTrustPlatforms?.length || 0) > (newEntry.lowTrustPlatforms?.length || 0))
+        newEntry.lowTrustPlatforms = ex.lowTrustPlatforms;
+      history[idx] = newEntry;
     } else {
-      history.unshift({
-        date:     today,
-        trackers: snapshot.trackers,
-        aiCalls:  snapshot.aiCalls,
-        lowTrust: snapshot.lowTrustCitations,
-      });
+      history.unshift(newEntry);
     }
-    history = history.slice(0, 30); // 最多保留 30 天
+
+    history = history.slice(0, 30);
     await chrome.storage.local.set({ [HISTORY_KEY]: history });
   } catch { /* 存储失败静默忽略 */ }
 }
@@ -375,10 +428,11 @@ const tabData = new Map();
 function getTabData(tabId) {
   if (!tabData.has(tabId)) {
     tabData.set(tabId, {
+      siteHostname: null,  // 当前站点主域名，由 webNavigation.onCommitted 写入
       requests: new Set(),
       trackers: [],
       apiCalls: [],
-      aiCalls:  [],        // AI 服务调用记录
+      aiCalls:  [],
       totalRequests: 0,
       timestamp: Date.now(),
       aiSearchSources: null,
@@ -481,7 +535,18 @@ function clearStaleBadge(tabId) {
 // ── Tab 导航时重置数据 ─────────────────────────────────────────────────────────
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId === 0) {
+    // 离开前先记录旧页面数据
+    const oldData = tabData.get(details.tabId);
+    if (oldData) recordSiteToSession(oldData);
+
     tabData.delete(details.tabId);
+
+    // 记录新页面的 hostname，供后续追踪器数据关联使用
+    try {
+      const hostname = new URL(details.url).hostname.replace(/^www\./, "");
+      if (hostname) getTabData(details.tabId).siteHostname = hostname;
+    } catch { /* 忽略无效 URL */ }
+
     chrome.action.setBadgeText({ text: "", tabId: details.tabId }).catch(() => {});
   }
 });
@@ -494,13 +559,15 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 // Tab 开始加载新页面时通知 popup
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "loading" && tab.active) {
-    tabData.delete(tabId);
+    // 数据清理由 webNavigation.onCommitted 负责（避免在记录前提前删除）
     chrome.action.setBadgeText({ text: "", tabId }).catch(() => {});
     chrome.runtime.sendMessage({ type: "TAB_LOADING" }).catch(() => {});
   }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  const data = tabData.get(tabId);
+  if (data) recordSiteToSession(data);
   tabData.delete(tabId);
   sessionTotals.tabLowTrust.delete(tabId);
 });
@@ -675,9 +742,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sources,
       updatedAt: Date.now(),
     };
-    // 更新本 tab 的低可信引用计数
     const lowCount = sources.filter((s) => s.tier === "low" || s.tier === "caution").length;
-    if (lowCount > 0) sessionTotals.tabLowTrust.set(sender.tab.id, lowCount);
+    if (lowCount > 0) {
+      sessionTotals.tabLowTrust.set(sender.tab.id, lowCount);
+      // 记录产生低可信引用的 AI 平台
+      try {
+        const platform = new URL(sender.tab.url || "").hostname.replace(/^www\./, "");
+        if (platform) {
+          sessionTotals.lowTrustPlatforms.set(platform,
+            (sessionTotals.lowTrustPlatforms.get(platform) || 0) + lowCount);
+        }
+      } catch { /* 忽略 */ }
+    }
   }
 
   if (message.type === "SUBSCRIPTION_SCAN" && sender.tab) {

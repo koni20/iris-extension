@@ -1060,10 +1060,12 @@ function renderHistory(entries) {
     return;
   }
 
-  // 汇总数据
-  const totalTrackers = entries.reduce((s, e) => s + (e.trackers || 0), 0);
-  const totalAi       = entries.reduce((s, e) => s + (e.aiCalls  || 0), 0);
-  const totalLow      = entries.reduce((s, e) => s + (e.lowTrust || 0), 0);
+  // ── 汇总栏（近 7 天）──────────────────────────────────────────────────────
+  const last7 = entries.slice(0, 7);
+  const totalTrackers = last7.reduce((s, e) => s + (e.trackers || 0), 0);
+  const totalAi       = last7.reduce((s, e) => s + (e.aiCalls  || 0), 0);
+  const totalLow      = last7.reduce((s, e) => s + (e.lowTrust || 0), 0);
+
   summary.innerHTML = `
     <div class="hist-sum-item">
       <div class="hist-sum-num">${totalTrackers}</div>
@@ -1078,32 +1080,104 @@ function renderHistory(entries) {
       <div class="hist-sum-label">⚠️ ${esc(t.lowTrust || "Low-Trust")}</div>
     </div>`;
 
-  const maxTrackers = Math.max(...entries.map((e) => e.trackers || 0), 1);
-  const todayStr    = new Date().toISOString().slice(0, 10);
-  const yestStr     = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const dayNames    = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  // ── Insights：聚合近 7 天数据 ─────────────────────────────────────────────
+  function aggregateTopSites(field) {
+    const agg = new Map();
+    for (const e of last7) {
+      for (const { hostname, count } of (e[field] || [])) {
+        agg.set(hostname, (agg.get(hostname) || 0) + count);
+      }
+    }
+    return [...agg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  }
 
-  const label7  = t.historyLast7  || "Last 7 days";
-  const label30 = t.historyLast30 || "Older";
+  const topTrackerSites  = aggregateTopSites("topSites");
+  const topAiSites       = aggregateTopSites("aiSites");
+  const topLowTrustPlatforms = aggregateTopSites("lowTrustPlatforms");
+  const totalSpend  = last7.reduce((s, e) => s + (e.spendSiteCount  || 0), 0);
+  const totalCookie = last7.reduce((s, e) => s + (e.cookieDarkCount || 0), 0);
 
-  let html = `<div class="hist-section-label">${esc(label7)}</div>`;
+  function tagsHtml(items, cls = "") {
+    if (!items.length) return `<span class="hist-tag" style="opacity:.5">${esc(t.historyNone || "None detected")}</span>`;
+    return items.map(([h, c]) =>
+      `<span class="hist-tag${cls ? " " + cls : ""}">${esc(h)}<span class="hist-tag-count">·${c}</span></span>`
+    ).join("");
+  }
+
+  const insightsLabel = t.historyInsights || "THIS WEEK'S INSIGHTS";
+  let html = `<div class="hist-section-label">${esc(insightsLabel)}</div>`;
+
+  html += `
+    <div class="hist-insight-row">
+      <div class="hist-insight-ico">🔍</div>
+      <div class="hist-insight-body">
+        <div class="hist-insight-label">${esc(t.historyTopTracked || "Most tracked sites")}</div>
+        <div class="hist-tags">${tagsHtml(topTrackerSites)}</div>
+      </div>
+    </div>
+    <div class="hist-insight-row">
+      <div class="hist-insight-ico">🤖</div>
+      <div class="hist-insight-body">
+        <div class="hist-insight-label">${esc(t.historyAiSites || "Sites using AI in background")}</div>
+        <div class="hist-tags">${tagsHtml(topAiSites, "tag-ai")}</div>
+      </div>
+    </div>
+    <div class="hist-insight-row">
+      <div class="hist-insight-ico">⚠️</div>
+      <div class="hist-insight-body">
+        <div class="hist-insight-label">${esc(t.historyLowTrustAI || "AI platforms with low-trust citations")}</div>
+        <div class="hist-tags">${tagsHtml(topLowTrustPlatforms, "tag-warn")}</div>
+      </div>
+    </div>
+    <div class="hist-insight-row">
+      <div class="hist-insight-ico">💳</div>
+      <div class="hist-insight-body">
+        <div class="hist-insight-label">${esc(t.historySpend || "Spend Guard alerts")}</div>
+        <span class="hist-insight-count${totalSpend === 0 ? " is-zero" : ""}">
+          ${totalSpend === 0
+            ? (t.historyNone || "None detected")
+            : totalSpend + " " + (t.historySites || "sites")}
+        </span>
+      </div>
+    </div>
+    <div class="hist-insight-row">
+      <div class="hist-insight-ico">🍪</div>
+      <div class="hist-insight-body">
+        <div class="hist-insight-label">${esc(t.historyCookieDark || "Cookie dark pattern sites")}</div>
+        <span class="hist-insight-count${totalCookie === 0 ? " is-zero" : ""}">
+          ${totalCookie === 0
+            ? (t.historyNone || "None detected")
+            : totalCookie + " " + (t.historySites || "sites")}
+        </span>
+      </div>
+    </div>`;
+
+  // ── 每日列表 ────────────────────────────────────────────────────────────────
+  const maxTrackers_ = Math.max(...entries.map((e) => e.trackers || 0), 1);
+  const todayStr_    = new Date().toISOString().slice(0, 10);
+  const yestStr_     = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayNames     = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const labelDaily   = t.historyDaily || "DAILY";
+  const labelOlder   = t.historyLast30 || "OLDER";
+
+  html += `<div class="hist-section-label">${esc(labelDaily)}</div>`;
   let addedOlderLabel = false;
 
   entries.forEach((entry, idx) => {
     if (idx === 7 && !addedOlderLabel) {
-      html += `<div class="hist-section-label">${esc(label30)}</div>`;
+      html += `<div class="hist-section-label">${esc(labelOlder)}</div>`;
       addedOlderLabel = true;
     }
-    const barPct  = Math.max(2, Math.round(((entry.trackers || 0) / maxTrackers) * 100));
-    const isToday = entry.date === todayStr;
+    const barPct  = Math.max(2, Math.round(((entry.trackers || 0) / maxTrackers_) * 100));
+    const isToday = entry.date === todayStr_;
     let dateLabel;
-    if (isToday)            dateLabel = t.historyToday     || "Today";
-    else if (entry.date === yestStr) dateLabel = t.historyYesterday || "Yesterday";
+    if (isToday)                   dateLabel = t.historyToday     || "Today";
+    else if (entry.date === yestStr_) dateLabel = t.historyYesterday || "Yesterday";
     else {
       const d = new Date(entry.date + "T12:00:00");
       dateLabel = dayNames[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate();
     }
-    const alertClass = (entry.lowTrust || 0) > 0 ? " has-alert" : "";
+    const alertCls = (entry.lowTrust || 0) > 0 ? " has-alert" : "";
     html += `
       <div class="hist-row${isToday ? " is-today" : ""}">
         <div class="hist-date">${esc(dateLabel)}</div>
@@ -1111,7 +1185,7 @@ function renderHistory(entries) {
         <div class="hist-stats">
           <span class="hist-stat">🔍 ${entry.trackers || 0}</span>
           <span class="hist-stat">🤖 ${entry.aiCalls  || 0}</span>
-          <span class="hist-stat${alertClass}">⚠️ ${entry.lowTrust || 0}</span>
+          <span class="hist-stat${alertCls}">⚠️ ${entry.lowTrust || 0}</span>
         </div>
       </div>`;
   });

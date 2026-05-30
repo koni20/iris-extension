@@ -1022,6 +1022,81 @@ body {
 }
 .hist-empty-icon { font-size: 28px; margin-bottom: 8px; }
 
+/* Insights section */
+.hist-insight-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 16px;
+}
+
+.hist-insight-ico {
+  font-size: 13px;
+  line-height: 1.6;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.hist-insight-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hist-insight-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.hist-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hist-tag {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 7px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.hist-tag .hist-tag-count {
+  color: var(--muted);
+  margin-left: 3px;
+}
+
+.hist-tag.tag-warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #92400e;
+}
+
+.hist-tag.tag-ai {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #5b21b6;
+}
+
+.hist-insight-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hist-insight-count.is-zero {
+  color: var(--muted);
+  font-weight: 400;
+}
+
 /* ── Content Safety (v1.2) ─────────────────────────────────────────────────── */
 .cs-summary {
   display: flex;
