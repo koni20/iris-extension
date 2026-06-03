@@ -207,6 +207,9 @@ function resetToScanning() {
   lastCookieJson         = "";
   lastSessionReplayJson  = "";
   lastConfirmshamingJson = "";
+  lastAntiGeoJson        = "";
+  const agMount = document.getElementById("antiGeoMount");
+  if (agMount) agMount.innerHTML = "";
   const asm = document.getElementById("aiSourcesMount");
   if (asm) asm.innerHTML = "";
   const csSummary = document.getElementById("csSummary");
@@ -246,6 +249,7 @@ let lastSpendJson = "";
 let lastCookieJson = "";
 let lastSessionReplayJson = "";
 let lastConfirmshamingJson = "";
+let lastAntiGeoJson = "";
 
 function pollData() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
@@ -256,6 +260,7 @@ function pollData() {
     const cookieJson = JSON.stringify(data.cookieConsent || null);
     const srJson     = JSON.stringify(data.sessionReplay || []);
     const cfJson     = JSON.stringify(data.confirmshaming || null);
+    const agJson     = JSON.stringify(data.antiGeo || null);
     const changed =
       data.trackers.length !== lastTrackerCount ||
       data.apiCalls.length !== lastApiCount ||
@@ -264,7 +269,8 @@ function pollData() {
       spendJson !== lastSpendJson         ||
       cookieJson !== lastCookieJson       ||
       srJson    !== lastSessionReplayJson ||
-      cfJson    !== lastConfirmshamingJson;
+      cfJson    !== lastConfirmshamingJson ||
+      agJson    !== lastAntiGeoJson;
     if (changed) {
       lastTrackerCount        = data.trackers.length;
       lastApiCount            = data.apiCalls.length;
@@ -274,6 +280,7 @@ function pollData() {
       lastCookieJson          = cookieJson;
       lastSessionReplayJson   = srJson;
       lastConfirmshamingJson  = cfJson;
+      lastAntiGeoJson         = agJson;
       render(data);
     }
   });
@@ -530,6 +537,7 @@ function render({
   cookieConsent = null,
   confirmshaming = null,
   sessionReplay = [],
+  antiGeo = null,
   url,
   session = null,
 }) {
@@ -586,6 +594,7 @@ function render({
 
   if (currentSettings.mod_aiSafety) {
     renderAiCalls(aiCalls, aiSearchSources);
+    renderAntiGeo(antiGeo); // 在 renderAiCalls 之后执行，角标有 GEO 信号时覆盖
   } else {
     renderModuleDisabled("Ai");
   }
@@ -856,6 +865,47 @@ function renderAiSearchSources(aiSearchSources) {
   });
 
   mount.appendChild(wrap);
+}
+
+// ── 渲染 Anti-GEO 检测结果 ──────────────────────────────────────────────────────
+function renderAntiGeo(antiGeo) {
+  const mount = document.getElementById("antiGeoMount");
+  if (!mount) return;
+
+  const signals = antiGeo?.signals || [];
+  if (signals.length === 0) {
+    mount.innerHTML = "";
+    return;
+  }
+
+  const isZh = (navigator.language || "").startsWith("zh");
+  mount.innerHTML = "";
+  const block = document.createElement("div");
+  block.className = "geo-block";
+  block.innerHTML = `
+    <div class="geo-header">
+      <span class="geo-icon">🔮</span>
+      <div>
+        <div class="geo-title">${esc(t.antiGeoTitle || "GEO Optimization Detected")}</div>
+        <div class="geo-sub">${esc(t.antiGeoSub || "This site uses structured markup engineered for AI citations.")}</div>
+      </div>
+    </div>
+    <div class="geo-signals" id="geoSignalList"></div>`;
+  mount.appendChild(block);
+
+  const list = block.querySelector("#geoSignalList");
+  for (const sig of signals) {
+    const label = isZh ? (sig.zh || sig.en || sig.type) : (sig.en || sig.type);
+    const item = document.createElement("div");
+    item.className = "geo-signal-item";
+    item.innerHTML = `
+      <span class="geo-signal-tag">${esc(sig.type === "llms_txt" ? "llms.txt" : sig.type)}</span>
+      <span class="geo-signal-text">${esc(label)}</span>`;
+    list.appendChild(item);
+  }
+
+  // 更新 AI 卡片角标，保留已有内容
+  updateCard("Ai", { dot: "amber", badge: `🔮 ${signals.length}`, badgeColor: "amber", findingLevel: "amber" });
 }
 
 // ── 渲染 AI 调用列表 ────────────────────────────────────────────────────────────

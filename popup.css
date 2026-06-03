@@ -471,6 +471,65 @@ body {
 .sr-service-item:last-child { border-bottom: none; }
 
 /* ── Confirmshaming 区块 ────────────────────────────────────────────────────── */
+/* ── Anti-GEO 检测块 ── */
+.geo-block {
+  margin: 8px 8px 4px;
+  border-radius: 10px;
+  background: #0d1a2e;
+  border: 1px solid #1e40af;
+  padding: 12px 14px;
+}
+.geo-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.geo-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.geo-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #93c5fd;
+  letter-spacing: 0.3px;
+}
+.geo-sub {
+  font-size: 11px;
+  color: #60a5fa;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.geo-signals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.geo-signal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+}
+.geo-signal-tag {
+  flex-shrink: 0;
+  background: #1e3a8a;
+  color: #93c5fd;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.geo-signal-text {
+  color: #bfdbfe;
+  line-height: 1.5;
+}
+
 .cs-block {
   margin: 8px 8px 4px;
   border-radius: 10px;

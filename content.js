@@ -107,6 +107,20 @@
       return;
     }
 
+    if (event.data.api === "anti-geo-scan") {
+      let detail;
+      try {
+        detail = JSON.parse(event.data.detail || "{}");
+      } catch {
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "ANTI_GEO_SCAN",
+        signals: Array.isArray(detail.signals) ? detail.signals : [],
+      });
+      return;
+    }
+
     const { api } = event.data;
     if (!api || reported.has(api)) return;
 

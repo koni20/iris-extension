@@ -765,4 +765,67 @@
     });
   })(); // end setupConfirmshamingScanner
 
+  // ── v1.9：Anti-GEO 检测 ──────────────────────────────────────────────────────
+  // 识别网站是否针对 AI 引用进行了专项优化（GEO = Generative Engine Optimization）
+  (function setupAntiGeoScanner() {
+    // JSON-LD @type 值 → 描述
+    const GEO_SCHEMA_MAP = {
+      FAQPage:   { en: "FAQ schema (FAQPage) to appear in AI question-answer results", zh: "使用 FAQPage 结构，专门出现在 AI 问答引用中" },
+      HowTo:     { en: "HowTo schema to appear in AI step-by-step answers",            zh: "使用 HowTo 结构，专门出现在 AI 步骤回答中" },
+      QAPage:    { en: "Q&A schema (QAPage) to appear in AI answer panels",            zh: "使用 QAPage 结构，专门出现在 AI 回答面板中" },
+      Speakable: { en: "Speakable markup to surface content in voice AI responses",    zh: "标记了 Speakable 区块，专门优化语音 AI 引用" },
+    };
+
+    function scanJsonLd() {
+      const signals = [];
+      const seen = new Set();
+      document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => {
+        try {
+          const parsed = JSON.parse(el.textContent || "");
+          const items = Array.isArray(parsed) ? parsed : [parsed];
+          for (const item of items) {
+            const types = [].concat(item["@type"] || []);
+            for (const t of types) {
+              if (GEO_SCHEMA_MAP[t] && !seen.has(t)) {
+                seen.add(t);
+                signals.push({ type: t, ...GEO_SCHEMA_MAP[t] });
+              }
+            }
+            // 嵌套 @graph
+            if (Array.isArray(item["@graph"])) {
+              for (const node of item["@graph"]) {
+                const nodeTypes = [].concat(node["@type"] || []);
+                for (const t of nodeTypes) {
+                  if (GEO_SCHEMA_MAP[t] && !seen.has(t)) {
+                    seen.add(t);
+                    signals.push({ type: t, ...GEO_SCHEMA_MAP[t] });
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+      });
+      return signals;
+    }
+
+    function runScan() {
+      if (!isMod("mod_aiSafety")) return;
+      const signals = scanJsonLd();
+      try {
+        window.postMessage({
+          __uncloak: true,
+          api: "anti-geo-scan",
+          detail: JSON.stringify({ signals }),
+        }, "*");
+      } catch {}
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => setTimeout(runScan, 600));
+    } else {
+      setTimeout(runScan, 600);
+    }
+  })(); // end setupAntiGeoScanner
+
 })(); // end main IIFE

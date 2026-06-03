@@ -511,6 +511,7 @@ function getTabData(tabId) {
       confirmshaming: null,         // 确认羞辱暗模式检测结果
       sessionReplay: [],            // Session Replay 服务商检测结果
       sessionReplayDomains: new Set(), // 去重用
+      antiGeo: null,                // Anti-GEO 检测结果
     });
   }
   return tabData.get(tabId);
@@ -679,6 +680,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           cookieConsent: null,
           confirmshaming: null,
           sessionReplay: [],
+          antiGeo: null,
           csMeta: await getCSMeta(),
         });
       }
@@ -765,6 +767,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         cookieConsent: data.cookieConsent || null,
         confirmshaming: data.confirmshaming || null,
         sessionReplay: data.sessionReplay || [],
+        antiGeo: data.antiGeo || null,
         url: tabUrl,
         session: snap,
       });
@@ -911,4 +914,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       updatedAt: Date.now(),
     };
   }
+
+  if (message.type === "ANTI_GEO_SCAN" && sender.tab) {
+    const data = getTabData(sender.tab.id);
+    const incoming = Array.isArray(message.signals) ? message.signals.filter(
+      (s) => s && typeof s.type === "string"
+    ) : [];
+    if (!data.antiGeo) data.antiGeo = { signals: [], updatedAt: Date.now() };
+    for (const sig of incoming) {
+      if (!data.antiGeo.signals.find((s) => s.type === sig.type)) {
+        data.antiGeo.signals.push(sig);
+      }
+    }
+    data.antiGeo.updatedAt = Date.now();
+  }
+});
+
+// ── Anti-GEO：llms.txt 检测（Tab 加载完成时异步触发）────────────────────────────
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete" || !tab.url) return;
+  if (!tab.url.startsWith("http")) return;
+  if (!activeSettings.mod_aiSafety) return;
+
+  let origin;
+  try { origin = new URL(tab.url).origin; } catch { return; }
+
+  try {
+    const res = await fetch(`${origin}/llms.txt`, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const data = getTabData(tabId);
+      if (!data.antiGeo) data.antiGeo = { signals: [], updatedAt: Date.now() };
+      if (!data.antiGeo.signals.find((s) => s.type === "llms_txt")) {
+        data.antiGeo.signals.push({
+          type: "llms_txt",
+          en: "Has llms.txt — provides curated content to guide AI systems",
+          zh: "存在 llms.txt——专门为 AI 系统提供结构化内容，引导 AI 引用",
+        });
+        data.antiGeo.updatedAt = Date.now();
+      }
+    }
+  } catch { /* 超时或 404，正常忽略 */ }
 });
