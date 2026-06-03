@@ -93,6 +93,20 @@
       return;
     }
 
+    if (event.data.api === "confirmshaming-scan") {
+      let detail;
+      try {
+        detail = JSON.parse(event.data.detail || "{}");
+      } catch {
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "CONFIRMSHAMING_SCAN",
+        hits: Array.isArray(detail.hits) ? detail.hits : [],
+      });
+      return;
+    }
+
     const { api } = event.data;
     if (!api || reported.has(api)) return;
 

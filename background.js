@@ -508,6 +508,7 @@ function getTabData(tabId) {
       },
       subscriptionGuard: null,
       cookieConsent: null,
+      confirmshaming: null,         // 确认羞辱暗模式检测结果
       sessionReplay: [],            // Session Replay 服务商检测结果
       sessionReplayDomains: new Set(), // 去重用
     });
@@ -676,6 +677,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           aiSearchSources: null,
           subscriptionGuard: null,
           cookieConsent: null,
+          confirmshaming: null,
           sessionReplay: [],
           csMeta: await getCSMeta(),
         });
@@ -761,6 +763,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         aiSearchSources,
         subscriptionGuard,
         cookieConsent: data.cookieConsent || null,
+        confirmshaming: data.confirmshaming || null,
         sessionReplay: data.sessionReplay || [],
         url: tabUrl,
         session: snap,
@@ -895,6 +898,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       bannerFound: !!message.bannerFound,
       patterns,
       updatedAt:   Date.now(),
+    };
+  }
+
+  if (message.type === "CONFIRMSHAMING_SCAN" && sender.tab) {
+    const data = getTabData(sender.tab.id);
+    const hits = Array.isArray(message.hits) ? message.hits.filter(
+      (h) => h && typeof h.text === "string" && h.text.length > 0
+    ) : [];
+    data.confirmshaming = {
+      hits,
+      updatedAt: Date.now(),
     };
   }
 });

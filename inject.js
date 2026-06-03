@@ -678,4 +678,86 @@
   });
   })(); // end setupCookieConsentScanner
 
+  // ── v1.8：确认羞辱（Confirmshaming）暗模式检测 ──────────────────────────────
+  (function setupConfirmshamingScanner() {
+    // 按钮/链接文本中的"拒绝行为"词——只扫这类元素
+    const DECLINE_RE = /\b(no(\s+thanks)?|nope|skip|pass|decline|dismiss|cancel|close|not\s+now|maybe\s+later|不了|算了|跳过|关闭|取消|放弃|暂不)\b/i;
+
+    // 羞辱性语言：在 decline 词附近出现"放弃好处"的表达
+    const SHAME_PATTERNS = [
+      // 英文：I don't want / I prefer to pay / I'll miss out
+      /i\s+(don'?t|do\s+not|won'?t|will\s+not)\s+(want|need|care\s+about|like)\s+(free|discount|offer|deal|saving|to\s+save|better|good)/i,
+      /i\s+(prefer|like|enjoy|love)\s+(paying\s+(full|more)|to\s+pay\s+(full|more)|missing\s+out|being\s+tracked|spam)/i,
+      /i\s+(don'?t|do\s+not)\s+(want\s+to\s+save|need\s+(this|the)\s+(offer|deal|discount))/i,
+      /no[,\s]+(thanks[,\s]+)?i\s+'?ll\s+(pass|miss\s+out|skip\s+this)/i,
+      /(pass|skip)\s+(on\s+)?(this\s+)?(offer|deal|discount|free|savings|benefit)/i,
+      /i'?m\s+not\s+interested\s+in\s+(saving|free|discount|better)/i,
+      /keep\s+(paying\s+(full|more)|missing\s+out)/i,
+      /no[,\s]+i\s+(don'?t\s+want|prefer\s+not\s+to)/i,
+      // 中文：不了/放弃 + 优惠类词
+      /(不了|算了|放弃)[，,\s]*(我)?(不想|不需要)?(优惠|折扣|省钱|免费|好处|特权|权益|礼品|礼物|奖励)/,
+      /放弃\s*(优惠|折扣|省钱|免费|好处|特权|权益|礼品|礼物|奖励|本次活动)/,
+      /(不想|不需要)\s*(优惠|折扣|省钱|免费|好处|特权|省\d+|节省)/,
+    ];
+
+    function isShaming(text) {
+      const t = text.trim();
+      if (t.length < 5 || t.length > 120) return false;
+      if (!DECLINE_RE.test(t)) return false;
+      return SHAME_PATTERNS.some((p) => p.test(t));
+    }
+
+    function scanButtons() {
+      if (!isMod("mod_cookieConsent")) return [];
+      const hits = [];
+      const seen = new Set();
+      const els = document.querySelectorAll('button, a, [role="button"], label, span[onclick], div[onclick]');
+      for (const el of els) {
+        const text = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+        if (!text || seen.has(text)) continue;
+        if (isShaming(text)) {
+          seen.add(text);
+          hits.push({ text: text.slice(0, 120) });
+        }
+      }
+      return hits;
+    }
+
+    let lastCSResult = null;
+
+    function runScan() {
+      if (!isMod("mod_cookieConsent")) return;
+      const hits = scanButtons();
+      const result = JSON.stringify(hits);
+      if (result === lastCSResult) return;
+      lastCSResult = result;
+      try {
+        window.postMessage({
+          __uncloak: true,
+          api: "confirmshaming-scan",
+          detail: JSON.stringify({ hits }),
+        }, "*");
+      } catch {}
+    }
+
+    function debounce(fn, ms) {
+      let id;
+      return (...a) => { clearTimeout(id); id = setTimeout(() => fn(...a), ms); };
+    }
+    const debouncedRun = debounce(runScan, 1000);
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(runScan, 1500);
+        setTimeout(runScan, 4000);
+      });
+    } else {
+      setTimeout(runScan, 1500);
+      setTimeout(runScan, 4000);
+    }
+    new MutationObserver(debouncedRun).observe(document.documentElement, {
+      childList: true, subtree: true,
+    });
+  })(); // end setupConfirmshamingScanner
+
 })(); // end main IIFE

@@ -516,6 +516,7 @@ function render({
   aiSearchSources = null,
   subscriptionGuard = null,
   cookieConsent = null,
+  confirmshaming = null,
   sessionReplay = [],
   url,
   session = null,
@@ -538,7 +539,7 @@ function render({
   }
 
   if (currentSettings.mod_cookieConsent) {
-    renderCookieConsent(cookieConsent);
+    renderCookieConsent(cookieConsent, confirmshaming);
   } else {
     renderModuleDisabled("Cookie");
   }
@@ -952,11 +953,41 @@ function renderAiCalls(aiCalls, aiSearchSources) {
   });
 }
 
-// ── 渲染 Cookie 同意暗模式（v1.5）──────────────────────────────────────────────
-function renderCookieConsent(cookieConsent) {
+// ── 渲染 Cookie 同意暗模式 + Confirmshaming（v1.5 / v1.8）────────────────────
+function renderCookieConsent(cookieConsent, confirmshaming = null) {
   const summary = document.getElementById("cookieSummary");
   const list    = document.getElementById("cookieList");
+  const csMount = document.getElementById("confirmshamingMount");
   if (!summary || !list) return;
+
+  // ── Confirmshaming 渲染（与 cookie consent 独立，置于卡片底部）───────────────
+  if (csMount) {
+    const csHits = confirmshaming?.hits || [];
+    if (csHits.length > 0) {
+      csMount.innerHTML = "";
+      const block = document.createElement("div");
+      block.className = "cs-block";
+      block.innerHTML = `
+        <div class="cs-block-header">
+          <span class="cs-block-icon">😔</span>
+          <div>
+            <div class="cs-block-title">${esc(t.confirmshamingTitle || "Confirmshaming detected")}</div>
+            <div class="cs-block-sub">${esc(t.confirmshamingSub || "Buttons designed to shame you for declining.")}</div>
+          </div>
+        </div>`;
+      for (const hit of csHits) {
+        const item = document.createElement("div");
+        item.className = "cs-shame-item";
+        item.innerHTML = `
+          <span class="cs-shame-tag">${esc(t.confirmshamingLabel || "Shaming text")}</span>
+          <span class="cs-shame-text">「${esc(hit.text)}」</span>`;
+        block.appendChild(item);
+      }
+      csMount.appendChild(block);
+    } else {
+      csMount.innerHTML = "";
+    }
+  }
 
   if (!cookieConsent) {
     summary.className = "cs-summary cs-rating-neutral";
@@ -968,12 +999,19 @@ function renderCookieConsent(cookieConsent) {
       </div>
     `;
     list.innerHTML = "";
-    updateCard("Cookie", { dot: "", badge: "—" });
+    const csHits = confirmshaming?.hits || [];
+    if (csHits.length > 0) {
+      updateCard("Cookie", { dot: "amber", badge: "😔", badgeColor: "amber", findingLevel: "amber" });
+    } else {
+      updateCard("Cookie", { dot: "", badge: "—" });
+    }
     return;
   }
 
   const { vendor, bannerFound, patterns } = cookieConsent;
   const vendorTag = vendor ? ` · ${esc(vendor)}` : "";
+  const csHits = confirmshaming?.hits || [];
+  const totalFindings = (patterns?.length || 0) + csHits.length;
 
   if (!bannerFound) {
     summary.className = "cs-summary cs-rating-green";
@@ -985,7 +1023,11 @@ function renderCookieConsent(cookieConsent) {
       </div>
     `;
     list.innerHTML = "";
-    updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    if (csHits.length > 0) {
+      updateCard("Cookie", { dot: "amber", badge: "😔", badgeColor: "amber", findingLevel: "amber" });
+    } else {
+      updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    }
     return;
   }
 
@@ -999,7 +1041,11 @@ function renderCookieConsent(cookieConsent) {
       </div>
     `;
     list.innerHTML = "";
-    updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    if (csHits.length > 0) {
+      updateCard("Cookie", { dot: "amber", badge: "😔 1", badgeColor: "amber", findingLevel: "amber" });
+    } else {
+      updateCard("Cookie", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    }
     return;
   }
 
@@ -1022,7 +1068,7 @@ function renderCookieConsent(cookieConsent) {
     `;
     list.appendChild(div);
   }
-  updateCard("Cookie", { dot: "amber", badge: String(patterns.length), badgeColor: "amber", findingLevel: "amber" });
+  updateCard("Cookie", { dot: "amber", badge: String(totalFindings), badgeColor: "amber", findingLevel: "amber" });
 }
 
 // ── 渲染 API 调用列表 ──────────────────────────────────────────────────────────
