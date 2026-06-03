@@ -683,19 +683,24 @@
     // 按钮/链接文本中的"拒绝行为"词——只扫这类元素
     const DECLINE_RE = /\b(no(\s+thanks)?|nope|skip|pass|decline|dismiss|cancel|close|not\s+now|maybe\s+later|不了|算了|跳过|关闭|取消|放弃|暂不)\b/i;
 
-    // 羞辱性语言：在 decline 词附近出现"放弃好处"的表达
+    // 羞辱性语言：组合了拒绝词之后，再出现"我不想要X"结构即可判定
+    // 不限定具体好处词，避免遗漏 traffic / leads / visitors 等变体
     const SHAME_PATTERNS = [
-      // 英文：I don't want / I prefer to pay / I'll miss out
-      /i\s+(don'?t|do\s+not|won'?t|will\s+not)\s+(want|need|care\s+about|like)\s+(free|discount|offer|deal|saving|to\s+save|better|good)/i,
-      /i\s+(prefer|like|enjoy|love)\s+(paying\s+(full|more)|to\s+pay\s+(full|more)|missing\s+out|being\s+tracked|spam)/i,
-      /i\s+(don'?t|do\s+not)\s+(want\s+to\s+save|need\s+(this|the)\s+(offer|deal|discount))/i,
-      /no[,\s]+(thanks[,\s]+)?i\s+'?ll\s+(pass|miss\s+out|skip\s+this)/i,
+      // 核心结构："I don't/won't want/need [anything]"
+      /\bi\s+(don'?t|do\s+not|won'?t|will\s+not)\s+(want|need|care\s+about)\b/i,
+      // "I prefer [negative]"
+      /\bi\s+(prefer|like|enjoy|love)\s+(paying\s+(full|more)|to\s+pay\s+(full|more)|missing\s+out|being\s+tracked)\b/i,
+      // "I'll pass / I'll miss out"
+      /\bi'?ll\s+(pass|miss\s+out|skip)\b/i,
+      // "keep paying / keep missing out"
+      /\bkeep\s+(paying\s+(full|more)|missing\s+out|losing)\b/i,
+      // 明确放弃好处
       /(pass|skip)\s+(on\s+)?(this\s+)?(offer|deal|discount|free|savings|benefit)/i,
-      /i'?m\s+not\s+interested\s+in\s+(saving|free|discount|better)/i,
-      /keep\s+(paying\s+(full|more)|missing\s+out)/i,
-      /no[,\s]+i\s+(don'?t\s+want|prefer\s+not\s+to)/i,
-      // 中文：不了/放弃 + 优惠类词
-      /(不了|算了|放弃)[，,\s]*(我)?(不想|不需要)?(优惠|折扣|省钱|免费|好处|特权|权益|礼品|礼物|奖励)/,
+      /i'?m\s+(not\s+interested|ok\s+(?:paying|losing|missing))/i,
+      // "No, I prefer not to"
+      /no[,\s]+i\s+(don'?t\s+want|prefer\s+not\s+to)\b/i,
+      // 中文：不了/放弃 + 不想
+      /(不了|算了|放弃)[，,\s]*(我)?(不想|不需要)/,
       /放弃\s*(优惠|折扣|省钱|免费|好处|特权|权益|礼品|礼物|奖励|本次活动)/,
       /(不想|不需要)\s*(优惠|折扣|省钱|免费|好处|特权|省\d+|节省)/,
     ];
