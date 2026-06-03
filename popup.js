@@ -516,6 +516,7 @@ function render({
   aiSearchSources = null,
   subscriptionGuard = null,
   cookieConsent = null,
+  sessionReplay = [],
   url,
   session = null,
 }) {
@@ -559,7 +560,7 @@ function render({
   if (effectiveTrackers.length > 0) renderComparison(effectiveTrackers.length);
 
   if (currentSettings.mod_trackers) {
-    renderTrackers(trackers);
+    renderTrackers(trackers, sessionReplay);
   } else {
     renderModuleDisabled("Trackers");
   }
@@ -684,53 +685,93 @@ function renderComparison(trackerCount) {
 }
 
 // ── 渲染追踪器列表 ──────────────────────────────────────────────────────────────
-function renderTrackers(trackers) {
+function renderTrackers(trackers, sessionReplay = []) {
   const list = document.getElementById("trackerList");
   const empty = document.getElementById("emptyTrackers");
 
-  list.innerHTML = ""; // 每次重新渲染前清空
+  list.innerHTML = "";
 
-  if (trackers.length === 0) {
+  const hasReplay   = sessionReplay.length > 0;
+  const hasTrackers = trackers.length > 0;
+
+  if (!hasReplay && !hasTrackers) {
     empty.style.display = "flex";
+    updateCard("Trackers", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
     return;
   }
   empty.style.display = "none";
 
-  const hint = document.createElement("div");
-  hint.className = "expand-hint";
-  hint.textContent = t.expandHint;
-  list.appendChild(hint);
-
-  trackers.forEach((tracker, i) => {
-    const item = document.createElement("div");
-    item.className = "tracker-item";
-    item.style.animationDelay = `${i * 40}ms`;
-
-    const tagClass = "tag-" + tracker.category.replace(/[\s/]+/g, "-");
-    const categoryLabel = t.categories[tracker.category] || tracker.category;
-
-    item.innerHTML = `
-      <div class="tracker-row">
-        <span class="tracker-tag ${esc(tagClass)}">${esc(categoryLabel)}</span>
-        <span class="tracker-domain">${esc(tracker.domain)}</span>
-        <span class="tracker-chevron">▼</span>
+  // ── Session Replay 警告区（置顶）──────────────────────────────────────────
+  if (hasReplay) {
+    const srBlock = document.createElement("div");
+    srBlock.className = "sr-block";
+    srBlock.innerHTML = `
+      <div class="sr-header">
+        <span class="sr-icon">🎥</span>
+        <div class="sr-titles">
+          <div class="sr-title">${esc(t.sessionReplayTitle || "Session Recording")}</div>
+          <div class="sr-subtitle">${esc(t.sessionReplaySubtitle || "This site is recording your session")}</div>
+        </div>
       </div>
-      <div class="tracker-company">${esc(tracker.company)}</div>
-      <div class="tracker-plain">${esc(tracker.plain)}</div>
-    `;
+      <div class="sr-warning">${esc(t.sessionReplayWarning || "Your mouse movements, clicks, scrolls, and form inputs may be captured by a third party.")}</div>
+      <div class="sr-services" id="srServices"></div>`;
+    list.appendChild(srBlock);
 
-    item.addEventListener("click", () => item.classList.toggle("expanded"));
-    list.appendChild(item);
-  });
-
-  // 更新 card 角标
-  if (trackers.length > 0) {
-    const hasCritical = trackers.some((tr) => ["Session Recording", "Data Broker", "Fingerprinting"].includes(tr.category));
-    const lvl = (hasCritical || trackers.length > 5) ? "red" : "amber";
-    updateCard("Trackers", { dot: lvl, badge: String(trackers.length), badgeColor: lvl, findingLevel: lvl });
-  } else {
-    updateCard("Trackers", { dot: "green", badge: t.clean || "Clean", badgeColor: "green" });
+    const svcContainer = srBlock.querySelector("#srServices");
+    sessionReplay.forEach((sr) => {
+      const svcEl = document.createElement("div");
+      svcEl.className = "sr-service-item";
+      const plain = (navigator.language || "").startsWith("zh") ? sr.plain_zh : sr.plain_en;
+      svcEl.innerHTML = `
+        <div class="sr-service-row">
+          <span class="tracker-tag tag-Session-Recording">${esc(t.sessionReplayTitle || "Session Recording")}</span>
+          <span class="tracker-domain">${esc(sr.domain)}</span>
+        </div>
+        <div class="tracker-company">${esc(sr.name)}</div>
+        <div class="tracker-plain">${esc(plain || sr.plain_en)}</div>`;
+      svcContainer.appendChild(svcEl);
+    });
   }
+
+  // ── 普通追踪器列表 ─────────────────────────────────────────────────────────
+  if (hasTrackers) {
+    const hint = document.createElement("div");
+    hint.className = "expand-hint";
+    hint.textContent = t.expandHint;
+    list.appendChild(hint);
+
+    trackers.forEach((tracker, i) => {
+      const item = document.createElement("div");
+      item.className = "tracker-item";
+      item.style.animationDelay = `${i * 40}ms`;
+
+      const tagClass = "tag-" + tracker.category.replace(/[\s/]+/g, "-");
+      const categoryLabel = t.categories[tracker.category] || tracker.category;
+
+      item.innerHTML = `
+        <div class="tracker-row">
+          <span class="tracker-tag ${esc(tagClass)}">${esc(categoryLabel)}</span>
+          <span class="tracker-domain">${esc(tracker.domain)}</span>
+          <span class="tracker-chevron">▼</span>
+        </div>
+        <div class="tracker-company">${esc(tracker.company)}</div>
+        <div class="tracker-plain">${esc(tracker.plain)}</div>
+      `;
+      item.addEventListener("click", () => item.classList.toggle("expanded"));
+      list.appendChild(item);
+    });
+  }
+
+  // ── 角标（Session Replay 优先触发红色）──────────────────────────────────
+  const hasCritical = hasReplay || trackers.some((tr) =>
+    ["Session Recording", "Data Broker", "Fingerprinting"].includes(tr.category)
+  );
+  const totalCount = trackers.length;
+  const lvl = (hasCritical || totalCount > 5) ? "red" : "amber";
+  const badgeText = hasReplay
+    ? `${totalCount} + 🎥`
+    : String(totalCount);
+  updateCard("Trackers", { dot: lvl, badge: badgeText, badgeColor: lvl, findingLevel: lvl });
 }
 
 function formatAiSourceReason(r) {

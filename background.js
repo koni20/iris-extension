@@ -409,6 +409,65 @@ async function updateTodayHistory(snapshot) {
   } catch { /* 存储失败静默忽略 */ }
 }
 
+// ── Session Replay 服务商数据库 ────────────────────────────────────────────────
+// 格式：hostname → { name, plain_en, plain_zh }
+const SESSION_REPLAY_DB = {
+  // Hotjar
+  "static.hotjar.com":       { name: "Hotjar",          plain_en: "Records your mouse movements, clicks, and keystrokes in real time.", plain_zh: "实时录制你的鼠标移动、点击和键盘输入。" },
+  "script.hotjar.com":       { name: "Hotjar",          plain_en: "Records your mouse movements, clicks, and keystrokes in real time.", plain_zh: "实时录制你的鼠标移动、点击和键盘输入。" },
+  "insights.hotjar.com":     { name: "Hotjar",          plain_en: "Records your mouse movements, clicks, and keystrokes in real time.", plain_zh: "实时录制你的鼠标移动、点击和键盘输入。" },
+  // Microsoft Clarity
+  "clarity.ms":              { name: "Microsoft Clarity", plain_en: "Records your exact page interactions — scroll, click, and rage-click patterns.", plain_zh: "录制你在页面上的精确操作——滚动、点击和连续点击行为。" },
+  // FullStory
+  "fullstory.com":           { name: "FullStory",        plain_en: "Captures a full video-like replay of your session on this site.", plain_zh: "录制你在此网站的完整会话，类似视频回放。" },
+  "rs.fullstory.com":        { name: "FullStory",        plain_en: "Captures a full video-like replay of your session on this site.", plain_zh: "录制你在此网站的完整会话，类似视频回放。" },
+  "edge.fullstory.com":      { name: "FullStory",        plain_en: "Captures a full video-like replay of your session on this site.", plain_zh: "录制你在此网站的完整会话，类似视频回放。" },
+  // LogRocket
+  "cdn.logrocket.io":        { name: "LogRocket",        plain_en: "Records user sessions including console logs and network requests.", plain_zh: "录制用户会话，包括控制台日志和网络请求。" },
+  "r.lr-in.com":             { name: "LogRocket",        plain_en: "Records user sessions including console logs and network requests.", plain_zh: "录制用户会话，包括控制台日志和网络请求。" },
+  "r.lr-in-prod.com":        { name: "LogRocket",        plain_en: "Records user sessions including console logs and network requests.", plain_zh: "录制用户会话，包括控制台日志和网络请求。" },
+  // Mouseflow
+  "cdn.mouseflow.com":       { name: "Mouseflow",        plain_en: "Records mouse movements, heatmaps, and form interactions.", plain_zh: "录制鼠标移动轨迹、热力图和表单填写行为。" },
+  // Lucky Orange
+  "cdn.luckyorange.com":     { name: "Lucky Orange",     plain_en: "Records sessions and generates click/scroll heatmaps.", plain_zh: "录制会话并生成点击和滚动热力图。" },
+  "luckyorange.net":         { name: "Lucky Orange",     plain_en: "Records sessions and generates click/scroll heatmaps.", plain_zh: "录制会话并生成点击和滚动热力图。" },
+  // Smartlook
+  "rec.smartlook.com":       { name: "Smartlook",        plain_en: "Records user sessions and user interactions for analysis.", plain_zh: "录制用户会话和交互行为用于分析。" },
+  "manager.smartlook.com":   { name: "Smartlook",        plain_en: "Records user sessions and user interactions for analysis.", plain_zh: "录制用户会话和交互行为用于分析。" },
+  // Inspectlet
+  "cdn.inspectlet.com":      { name: "Inspectlet",       plain_en: "Records sessions, mouse movements, and form keystrokes.", plain_zh: "录制会话、鼠标移动和表单键盘输入。" },
+  // Heap
+  "cdn.heapanalytics.com":   { name: "Heap",             plain_en: "Automatically captures every user interaction for replay.", plain_zh: "自动捕获每一个用户操作以供回放。" },
+  "heapanalytics.com":       { name: "Heap",             plain_en: "Automatically captures every user interaction for replay.", plain_zh: "自动捕获每一个用户操作以供回放。" },
+  // Quantum Metric
+  "cdn.quantummetric.com":   { name: "Quantum Metric",   plain_en: "Records sessions for digital experience analytics.", plain_zh: "录制会话用于数字体验分析。" },
+  // Pendo
+  "cdn.pendo.io":            { name: "Pendo",            plain_en: "Records user interactions for product analytics and in-app guides.", plain_zh: "录制用户交互用于产品分析和应用内引导。" },
+  "data.pendo.io":           { name: "Pendo",            plain_en: "Records user interactions for product analytics and in-app guides.", plain_zh: "录制用户交互用于产品分析和应用内引导。" },
+  // Contentsquare
+  "t.contentsquare.net":     { name: "Contentsquare",    plain_en: "Records full session replays and user journeys.", plain_zh: "录制完整的会话回放和用户访问路径。" },
+  "cdn.contentsquare.net":   { name: "Contentsquare",    plain_en: "Records full session replays and user journeys.", plain_zh: "录制完整的会话回放和用户访问路径。" },
+  // Glassbox
+  "api.glassboxdigital.io":  { name: "Glassbox",         plain_en: "Records full session replays including all page interactions.", plain_zh: "录制完整会话回放，包括所有页面交互。" },
+  // SessionCam
+  "sessioncam.com":          { name: "SessionCam",        plain_en: "Records and analyzes user session replays.", plain_zh: "录制并分析用户会话回放。" },
+};
+
+/**
+ * 检查 hostname 是否命中 Session Replay 服务商
+ * 支持精确匹配和子域名后缀匹配
+ */
+function matchSessionReplay(hostname) {
+  if (!hostname) return null;
+  const h = hostname.replace(/^www\./, "").toLowerCase();
+  if (SESSION_REPLAY_DB[h]) return SESSION_REPLAY_DB[h];
+  // 子域名匹配：例如 eu.static.hotjar.com → static.hotjar.com
+  for (const key of Object.keys(SESSION_REPLAY_DB)) {
+    if (h.endsWith("." + key)) return SESSION_REPLAY_DB[key];
+  }
+  return null;
+}
+
 // ── 用户设置 ───────────────────────────────────────────────────────────────────
 const SETTINGS_KEY = "irisSettings";
 const DEFAULT_SETTINGS = {
@@ -449,6 +508,8 @@ function getTabData(tabId) {
       },
       subscriptionGuard: null,
       cookieConsent: null,
+      sessionReplay: [],            // Session Replay 服务商检测结果
+      sessionReplayDomains: new Set(), // 去重用
     });
   }
   return tabData.get(tabId);
@@ -482,6 +543,22 @@ chrome.webRequest.onBeforeRequest.addListener(
           time: Date.now()
         });
         sessionTotals.trackerDomains.add(hostname);
+        updateBadge(tabId, data);
+      }
+    }
+
+    // Session Replay 检测（同受 mod_trackers 开关控制）
+    if (!data.sessionReplayDomains.has(hostname)) {
+      const srHit = matchSessionReplay(hostname);
+      if (srHit) {
+        data.sessionReplayDomains.add(hostname);
+        data.sessionReplay.push({
+          name:     srHit.name,
+          domain:   hostname,
+          plain_en: srHit.plain_en,
+          plain_zh: srHit.plain_zh,
+          time:     Date.now(),
+        });
         updateBadge(tabId, data);
       }
     }
@@ -523,7 +600,7 @@ function updateBadge(tabId, data) {
   const count = data.trackers.length;
   const hasHighRisk = data.trackers.some(t =>
     ["Fingerprinting", "Data Broker", "Session Recording"].includes(t.category)
-  );
+  ) || (data.sessionReplay && data.sessionReplay.length > 0);
 
   const text  = count > 0 ? String(count) : "";
   const color = hasHighRisk ? "#ef4444" : count > 5 ? "#f59e0b" : "#7c6af7";
@@ -599,6 +676,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           aiSearchSources: null,
           subscriptionGuard: null,
           cookieConsent: null,
+          sessionReplay: [],
           csMeta: await getCSMeta(),
         });
       }
@@ -683,6 +761,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         aiSearchSources,
         subscriptionGuard,
         cookieConsent: data.cookieConsent || null,
+        sessionReplay: data.sessionReplay || [],
         url: tabUrl,
         session: snap,
       });
