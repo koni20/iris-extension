@@ -201,10 +201,12 @@ function resetToScanning() {
   document.getElementById("siteBadge").textContent    = "—";
   document.getElementById("phishingBanner").classList.add("hidden");
   document.getElementById("contentSafetyList").innerHTML = "";
-  lastContentSafetyJson = "";
-  lastAiSourcesJson = "";
-  lastSpendJson = "";
-  lastCookieJson = "";
+  lastContentSafetyJson  = "";
+  lastAiSourcesJson      = "";
+  lastSpendJson          = "";
+  lastCookieJson         = "";
+  lastSessionReplayJson  = "";
+  lastConfirmshamingJson = "";
   const asm = document.getElementById("aiSourcesMount");
   if (asm) asm.innerHTML = "";
   const csSummary = document.getElementById("csSummary");
@@ -216,6 +218,8 @@ function resetToScanning() {
   const cookieSummary = document.getElementById("cookieSummary");
   if (cookieSummary) { cookieSummary.className = "cs-summary cs-rating-neutral"; cookieSummary.innerHTML = ""; }
   document.getElementById("cookieList").innerHTML = "";
+  const csMount = document.getElementById("confirmshamingMount");
+  if (csMount) csMount.innerHTML = "";
   // 重置所有 card 角标
   ["Trackers","Apis","Ai","Content","Spend","Cookie"].forEach((k) => {
     updateCard(k, { dot: "", badge: "" });
@@ -240,6 +244,8 @@ let lastContentSafetyJson = "";
 let lastAiSourcesJson = "";
 let lastSpendJson = "";
 let lastCookieJson = "";
+let lastSessionReplayJson = "";
+let lastConfirmshamingJson = "";
 
 function pollData() {
   chrome.runtime.sendMessage({ type: "GET_DATA" }, (data) => {
@@ -248,20 +254,26 @@ function pollData() {
     const asJson     = JSON.stringify(data.aiSearchSources || null);
     const spendJson  = JSON.stringify(data.subscriptionGuard || null);
     const cookieJson = JSON.stringify(data.cookieConsent || null);
+    const srJson     = JSON.stringify(data.sessionReplay || []);
+    const cfJson     = JSON.stringify(data.confirmshaming || null);
     const changed =
       data.trackers.length !== lastTrackerCount ||
       data.apiCalls.length !== lastApiCount ||
       csJson    !== lastContentSafetyJson ||
       asJson    !== lastAiSourcesJson     ||
       spendJson !== lastSpendJson         ||
-      cookieJson !== lastCookieJson;
+      cookieJson !== lastCookieJson       ||
+      srJson    !== lastSessionReplayJson ||
+      cfJson    !== lastConfirmshamingJson;
     if (changed) {
-      lastTrackerCount      = data.trackers.length;
-      lastApiCount          = data.apiCalls.length;
-      lastContentSafetyJson = csJson;
-      lastAiSourcesJson     = asJson;
-      lastSpendJson         = spendJson;
-      lastCookieJson        = cookieJson;
+      lastTrackerCount        = data.trackers.length;
+      lastApiCount            = data.apiCalls.length;
+      lastContentSafetyJson   = csJson;
+      lastAiSourcesJson       = asJson;
+      lastSpendJson           = spendJson;
+      lastCookieJson          = cookieJson;
+      lastSessionReplayJson   = srJson;
+      lastConfirmshamingJson  = cfJson;
       render(data);
     }
   });
