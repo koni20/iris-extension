@@ -1,11 +1,16 @@
 # Iris Roadmap
 
-## 当前版本 v1.8.0（最新）
+## 当前版本 v1.9.0（最新）
+
+- ✅ **Anti-GEO 检测**：识别为「被 AI 引用」而做的生成式引擎优化（GEO）——扫描页面 JSON-LD 中的 FAQPage / HowTo / QAPage / Speakable 结构标记，并核查站点是否备有 `llms.txt`，命中后在 AI 安全卡片顶部以蓝色提示，提醒用户该来源内容可能为迎合 AI 而工程化设计
+- 🔧 **llms.txt 检测修复**：早期用 HEAD + 状态码 200 判断，会被「软 404」（返回 200 的错误页）误报；改为 GET 读取正文，校验 content-type 与 Markdown 特征，确认确实是文本型 llms.txt 才算命中
+
+## 历史版本
+
+### v1.8.0（已发布）
 
 - ✅ **Session Replay 检测**：检测 Hotjar / Microsoft Clarity / FullStory / LogRocket / Mouseflow 等 20+ 会话录制服务，在 Trackers 卡片顶部显示红色警告，提示鼠标轨迹、点击、表单输入可能被第三方录制
 - ✅ **Confirmshaming 暗模式检测**：扫描页面按钮/链接文本，识别通过"我不想要更多流量""放弃优惠"等羞辱性话术诱导用户接受的设计模式，在 Cookie 卡片内以橙色警告展示
-
-## 历史版本
 
 ### v1.7.1（已发布）
 

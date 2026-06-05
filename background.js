@@ -940,21 +940,48 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try { origin = new URL(tab.url).origin; } catch { return; }
 
   try {
+    // 用 GET 读取正文：很多站点对不存在的路径返回「软 404」(状态码 200 + HTML 错误页)，
+    // 仅凭 res.ok 会误报。这里额外校验 content-type 和正文，确认确实是文本型 llms.txt。
     const res = await fetch(`${origin}/llms.txt`, {
-      method: "HEAD",
+      method: "GET",
       signal: AbortSignal.timeout(4000),
     });
-    if (res.ok) {
-      const data = getTabData(tabId);
-      if (!data.antiGeo) data.antiGeo = { signals: [], updatedAt: Date.now() };
-      if (!data.antiGeo.signals.find((s) => s.type === "llms_txt")) {
-        data.antiGeo.signals.push({
-          type: "llms_txt",
-          en: "Has llms.txt — provides curated content to guide AI systems",
-          zh: "存在 llms.txt——专门为 AI 系统提供结构化内容，引导 AI 引用",
-        });
-        data.antiGeo.updatedAt = Date.now();
-      }
+    if (!res.ok) return;
+
+    const ctype = (res.headers.get("content-type") || "").toLowerCase();
+    // HTML 类型一律排除（软 404 / SPA 兜底页）
+    if (ctype.includes("text/html")) return;
+
+    const body = (await res.text()).slice(0, 4000).trim();
+    if (!isLikelyLlmsTxt(body)) return;
+
+    const data = getTabData(tabId);
+    if (!data.antiGeo) data.antiGeo = { signals: [], updatedAt: Date.now() };
+    if (!data.antiGeo.signals.find((s) => s.type === "llms_txt")) {
+      data.antiGeo.signals.push({
+        type: "llms_txt",
+        en: "Has llms.txt — provides curated content to guide AI systems",
+        zh: "存在 llms.txt——专门为 AI 系统提供结构化内容，引导 AI 引用",
+      });
+      data.antiGeo.updatedAt = Date.now();
     }
   } catch { /* 超时或 404，正常忽略 */ }
 });
+
+/**
+ * 判断正文是否像真正的 llms.txt（Markdown 文本），而非 HTML 错误页。
+ * llms.txt 规范：纯文本 / Markdown，通常以 # 标题开头并含链接列表。
+ */
+function isLikelyLlmsTxt(text) {
+  if (!text || text.length < 10) return false;
+  // 以 HTML 开头 → 是网页，不是 llms.txt
+  if (/^\s*<(?:!doctype|html|head|body|script|meta)/i.test(text)) return false;
+  // 正文中含明显的 HTML 文档标记 → 排除
+  if (/<html[\s>]|<\/html>|<head[\s>]|<body[\s>]/i.test(text)) return false;
+  // 常见软 404 文案 → 排除
+  if (/页面.*(找不到|不存在|无法显示)|页面已删除|not\s+found|404\b|page\s+not\s+found/i.test(text)) return false;
+  // 正向特征：Markdown 标题或链接（llms.txt 规范的典型结构）
+  const hasMarkdownHeading = /^#\s+\S/m.test(text);
+  const hasMarkdownLink = /\[[^\]]+\]\([^)]+\)/.test(text);
+  return hasMarkdownHeading || hasMarkdownLink;
+}
