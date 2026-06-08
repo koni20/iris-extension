@@ -1,11 +1,16 @@
 # Iris Roadmap
 
-## 当前版本 v1.9.0（最新）
+## 当前版本 v1.9.1（最新）
+
+- 🔧 **Anti-GEO 降误报**：FAQPage 等结构化标记在普通网站极常见，原来单个即报警；改为信号分级——强信号（llms.txt / Speakable）单独出现才判定，弱信号（FAQPage / HowTo / QAPage）需 ≥2 个同时出现，单个常见 FAQ 页不再误报
+- ✅ **反馈入口**：popup 底部新增「🐞 Report」，一键打开 GitHub issue 并自动预填当前页面地址、版本号、漏检/误报模板，方便用户精准反馈（不收集任何数据，仅打开链接）
+
+## 历史版本
+
+### v1.9.0（已发布）
 
 - ✅ **Anti-GEO 检测**：识别为「被 AI 引用」而做的生成式引擎优化（GEO）——扫描页面 JSON-LD 中的 FAQPage / HowTo / QAPage / Speakable 结构标记，并核查站点是否备有 `llms.txt`，命中后在 AI 安全卡片顶部以蓝色提示，提醒用户该来源内容可能为迎合 AI 而工程化设计
 - 🔧 **llms.txt 检测修复**：早期用 HEAD + 状态码 200 判断，会被「软 404」（返回 200 的错误页）误报；改为 GET 读取正文，校验 content-type 与 Markdown 特征，确认确实是文本型 llms.txt 才算命中
-
-## 历史版本
 
 ### v1.8.0（已发布）
 

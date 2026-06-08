@@ -43,6 +43,43 @@ document.getElementById("emptySpendSub").textContent     = t.subEmptyScanningSub
 // session bar 静态文字
 document.getElementById("sessionLabel").textContent = t.sessionLabel || "SESSION";
 
+// 反馈入口静态文字
+(function initFeedbackLink() {
+  const btn = document.getElementById("feedbackBtn");
+  if (!btn) return;
+  btn.textContent = "🐞 " + (t.feedbackLink || "Report");
+  btn.title = t.feedbackTitle || "Report a missed or wrong detection";
+})();
+
+// 根据当前页面 URL 生成预填的 GitHub issue 链接
+function updateFeedbackLink(url) {
+  const btn = document.getElementById("feedbackBtn");
+  if (!btn) return;
+  const repo = "https://github.com/koni20/iris-extension/issues/new";
+  let pageUrl = url || "";
+  // 仅保留 http(s) 页面地址，避免把扩展内部页或空值填进去
+  if (!/^https?:\/\//i.test(pageUrl)) pageUrl = "";
+  const ver = (typeof chrome !== "undefined" && chrome.runtime?.getManifest)
+    ? chrome.runtime.getManifest().version : "";
+  const title = `[Report] ${pageUrl ? new URL(pageUrl).hostname.replace(/^www\./, "") : "issue"}`;
+  const body = [
+    "<!-- 感谢反馈 / Thanks for the report -->",
+    "",
+    `Page URL: ${pageUrl || "(N/A)"}`,
+    `Iris version: ${ver}`,
+    "",
+    "Type / 类型 (留下其一 / keep one):",
+    "- [ ] Missed something / 漏检",
+    "- [ ] False positive / 误报",
+    "",
+    "Module / 模块 (Trackers / Fingerprinting / AI Safety / Content Safety / Spend Guard / Cookie / GEO):",
+    "",
+    "Details / 详细描述:",
+    "",
+  ].join("\n");
+  btn.href = `${repo}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
+
 // ── Section Cards 折叠导航 ────────────────────────────────────────────────────
 function initCards() {
   document.querySelectorAll(".sc-hdr").forEach((hdr) => {
@@ -567,6 +604,7 @@ function render({
   let hostname = "—";
   try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch {}
   document.getElementById("siteBadge").textContent = hostname;
+  updateFeedbackLink(url);
 
   const effectiveTrackers = currentSettings.mod_trackers ? trackers : [];
   const effectiveApis     = currentSettings.mod_fingerprinting ? apiCalls : [];
@@ -868,12 +906,23 @@ function renderAiSearchSources(aiSearchSources) {
 }
 
 // ── 渲染 Anti-GEO 检测结果 ──────────────────────────────────────────────────────
+// 强信号：刻意为 AI 准备的标记，单独出现即可判定 GEO 倾向
+const GEO_STRONG_SIGNALS = new Set(["llms_txt", "Speakable"]);
+
 function renderAntiGeo(antiGeo) {
   const mount = document.getElementById("antiGeoMount");
   if (!mount) return;
 
   const signals = antiGeo?.signals || [];
-  if (signals.length === 0) {
+
+  // 信号分级，降低误报：
+  // FAQPage / HowTo / QAPage 这类结构化标记在普通网站上极常见（正经 FAQ 页就有），
+  // 单独一个不足以判定「为 AI 而优化」。仅当出现强信号（llms.txt / Speakable），
+  // 或同时出现 ≥2 个结构化标记时，才认定为 GEO 倾向并提示。
+  const hasStrong = signals.some((s) => GEO_STRONG_SIGNALS.has(s.type));
+  const shouldFlag = hasStrong || signals.length >= 2;
+
+  if (signals.length === 0 || !shouldFlag) {
     mount.innerHTML = "";
     return;
   }
