@@ -478,6 +478,7 @@ const DEFAULT_SETTINGS = {
   mod_spendGuard:     true,
   mod_cookieConsent:  true,
   spendSensitivity:   "normal",   // "normal" | "strict"
+  aiAnnotateInPage:   true,       // 在 AI 回答页内嵌引用体检角标/面板
 };
 
 // 内存缓存，避免在高频 webRequest 回调里每次读 storage
@@ -846,6 +847,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       } catch { /* 忽略 */ }
     }
+    // 把已打分结果回传给 content.js 用于页面内标注（scoreCitationDomain 同步，可同步回包）
+    sendResponse({ scored: sources });
+    return true;
   }
 
   if (message.type === "SUBSCRIPTION_SCAN" && sender.tab) {
@@ -887,6 +891,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     // 同步更新内存缓存，让 webRequest 等高频路径立即生效
     activeSettings = { ...DEFAULT_SETTINGS, ...safe };
+    // 广播到所有标签页，让页面内脚本（如 AI 来源体检角标）即时生效，无需刷新
+    chrome.tabs.query({}, (tabs) => {
+      for (const tb of tabs) {
+        if (tb.id != null && tb.id >= 0) {
+          chrome.tabs.sendMessage(tb.id, { type: "SETTINGS_UPDATED", settings: activeSettings }, () => void chrome.runtime.lastError);
+        }
+      }
+    });
     chrome.storage.local.set({ [SETTINGS_KEY]: safe }, () => sendResponse({ ok: true }));
     return true;
   }

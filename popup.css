@@ -182,12 +182,12 @@ body {
 }
 
 .gear-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--s2);
-  font-size: 14px;
+  font-size: 21px;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -1002,6 +1002,10 @@ body {
 .tog input:checked + .tog-sl::before { transform: translateX(16px); }
 
 /* Sensitivity row */
+.sp-row-sub { padding-left: 30px; }
+.sp-row-sub .sp-ico { font-size: 12px; opacity: 0.7; }
+.sp-row-sub .sp-name { font-size: 12px; opacity: 0.85; }
+
 .sp-row-sens { align-items: flex-start; cursor: default; }
 .sp-row-sens:hover { background: transparent; }
 .sp-sens-wrap { flex: 1; }
@@ -1044,12 +1048,12 @@ body {
 
 /* ── History Button ─────────────────────────────────────────────────────────── */
 .history-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--s2);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   display: flex;

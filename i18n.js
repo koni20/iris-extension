@@ -176,6 +176,7 @@ const TRANSLATIONS = {
     // Settings panel
     settingsTitle:          "Settings",
     settingsModules:        "Modules",
+    aiAnnotateToggle:       "In-page badges & panel",
     settingsSensitivity:    "Spend Guard",
     settingsSensTitle:      "Detection Sensitivity",
     settingsSensNormal:     "Normal",
@@ -368,6 +369,7 @@ const TRANSLATIONS = {
     sessionLabel: "本次会话",
     settingsTitle:          "设置",
     settingsModules:        "模块",
+    aiAnnotateToggle:       "页面内角标与面板",
     settingsSensitivity:    "消费守卫",
     settingsSensTitle:      "检测灵敏度",
     settingsSensNormal:     "标准",
@@ -521,6 +523,7 @@ const TRANSLATIONS = {
     sessionLabel: "セッション",
     settingsTitle:          "設定",
     settingsModules:        "モジュール",
+    aiAnnotateToggle:       "ページ内バッジとパネル",
     settingsSensitivity:    "サブスク監視",
     settingsSensTitle:      "検出感度",
     settingsSensNormal:     "標準",

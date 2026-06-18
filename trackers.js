@@ -492,6 +492,7 @@ const AI_WEBSITES_DB = {
   "you.com":                { company: "You.com",           model: "YouChat",          risk: "high" },
 
   // 中国
+  "kimi.com":               { company: "Moonshot AI (月之暗面)", model: "Kimi",         risk: "high" },
   "kimi.moonshot.cn":       { company: "Moonshot AI (月之暗面)", model: "Kimi",         risk: "high" },
   "kimi.ai":                { company: "Moonshot AI (月之暗面)", model: "Kimi",         risk: "high" },
   "chat.deepseek.com":      { company: "DeepSeek",          model: "DeepSeek-V3 / R1", risk: "high" },
@@ -593,7 +594,7 @@ const AI_BRAND_WHITELIST = [
   {
     brand: "Kimi（月之暗面）",
     keywords: ["kimi"],
-    legit: ["kimi.moonshot.cn", "kimi.ai", "moonshot.cn"],
+    legit: ["kimi.com", "kimi.moonshot.cn", "kimi.ai", "moonshot.cn"],
   },
   {
     brand: "DeepSeek（深度求索）",

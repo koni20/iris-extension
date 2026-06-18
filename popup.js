@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   mod_aiSafety: true, mod_contentSafety: true,
   mod_spendGuard: true, mod_cookieConsent: true,
   spendSensitivity: "normal",
+  aiAnnotateInPage: true,
 };
 let currentSettings = { ...DEFAULT_SETTINGS };
 
@@ -105,6 +106,7 @@ function initSettingsPanel() {
   document.getElementById("spMod_contentSafety").textContent = t.tabContentSafety;
   document.getElementById("spMod_spendGuard").textContent    = t.tabSpendGuard;
   document.getElementById("spMod_cookieConsent").textContent = t.tabCookieConsent;
+  document.getElementById("spAiAnnotate").textContent        = t.aiAnnotateToggle    || "In-page source check";
   document.getElementById("spSensTitle").textContent         = t.settingsSensTitle  || "Detection Sensitivity";
   document.getElementById("sensNormal").textContent          = t.settingsSensNormal || "Normal";
   document.getElementById("sensStrict").textContent          = t.settingsSensStrict || "Strict";
@@ -122,6 +124,12 @@ function initSettingsPanel() {
       currentSettings["mod_" + mod] = e.target.checked;
       saveSettings();
     });
+  });
+
+  // AI 页面内标注开关
+  document.getElementById("tog_aiAnnotate").addEventListener("change", (e) => {
+    currentSettings.aiAnnotateInPage = e.target.checked;
+    saveSettings();
   });
 
   // 灵敏度 pill
@@ -166,6 +174,8 @@ function applySettingsToUI() {
     const el = document.getElementById("tog_" + mod);
     if (el) el.checked = !!currentSettings["mod_" + mod];
   });
+  const annEl = document.getElementById("tog_aiAnnotate");
+  if (annEl) annEl.checked = currentSettings.aiAnnotateInPage !== false;
   applySensitivityUI(currentSettings.spendSensitivity || "normal");
 }
 
