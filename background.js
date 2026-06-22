@@ -1,4 +1,4 @@
-importScripts("trackers.js", "contentSafety.js", "citationLowTrust.js");
+importScripts("trackers.js", "contentSafety.js", "citationLowTrust.js", "citationSourceType.js");
 
 // ── 追踪器数据库动态更新 ────────────────────────────────────────────────────────
 const DB_CACHE_KEY  = "irisTrackerCache";
@@ -251,7 +251,12 @@ function scoreCitationDomain(hostname) {
     reasons.push({ kind: "citationList", key: cit.reasonKey });
   }
 
-  return { tier, reasons };
+  // 来源分类（v1.11）：低可信优先归为 lowtrust，否则按来源类型库分类
+  const category = tier === "low" || tier === "caution"
+    ? "lowtrust"
+    : classifyCitationSource(hostname);
+
+  return { tier, reasons, category };
 }
 
 function computeContentSafetyRating(cs) {

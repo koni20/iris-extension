@@ -168,16 +168,26 @@
     <!-- Section Cards (v1.5) -->
     <div class="sections" id="sections">
 
+      <!-- 招牌卡挂载点（按上下文前置） -->
+      <div id="heroMount"></div>
+
+      <!-- 更多 / 高级（默认折叠） -->
+      <button class="more-toggle" id="moreToggle">
+        <span class="more-ttl" id="moreTtl">More</span>
+        <span class="more-chv">›</span>
+      </button>
+      <div id="moreMount" class="more-collapsed"></div>
+
       <!-- Trackers -->
       <div class="sc" id="cardTrackers">
-        <button class="sc-hdr open" id="hdrTrackers">
+        <button class="sc-hdr" id="hdrTrackers">
           <span class="sc-dot" id="dotTrackers"></span>
           <span class="sc-ico">🔍</span>
           <span class="sc-ttl" id="ttlTrackers"></span>
           <span class="sc-bdg hidden" id="bdgTrackers"></span>
           <span class="sc-chv">›</span>
         </button>
-        <div class="sc-body open" id="bdyTrackers">
+        <div class="sc-body" id="bdyTrackers">
           <div class="empty-state" id="emptyTrackers">
             <div class="empty-icon">✅</div>
             <div class="empty-title" id="emptyTrackersTitle"></div>

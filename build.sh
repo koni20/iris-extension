@@ -25,6 +25,7 @@ FILES=(
   trackers.js
   contentSafety.js
   citationLowTrust.js
+  citationSourceType.js
   i18n.js
   popup.html
   popup.css

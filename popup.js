@@ -91,8 +91,49 @@ function initCards() {
       hdr.classList.toggle("open", !isOpen);
     });
   });
+
+  // 「更多 / 高级」折叠区
+  const moreToggle = document.getElementById("moreToggle");
+  const moreMount = document.getElementById("moreMount");
+  const moreTtl = document.getElementById("moreTtl");
+  if (moreTtl) moreTtl.textContent = t.moreSection || "More";
+  if (moreToggle && moreMount) {
+    moreToggle.addEventListener("click", () => {
+      const collapsed = moreMount.classList.toggle("more-collapsed");
+      moreToggle.classList.toggle("open", !collapsed);
+    });
+  }
 }
 initCards();
+
+// ── 按页面类型前置招牌卡，其余收进「更多」 ────────────────────────────────────
+const CARD_ORDER = ["cardTrackers", "cardApis", "cardAi", "cardContent", "cardSpend", "cardCookie"];
+
+function setCardOpen(card, open) {
+  const hdr = card.querySelector(".sc-hdr");
+  const body = card.querySelector(".sc-body");
+  if (hdr) hdr.classList.toggle("open", open);
+  if (body) body.classList.toggle("open", open);
+}
+
+function arrangeCards(isAiPage) {
+  const heroMount = document.getElementById("heroMount");
+  const moreMount = document.getElementById("moreMount");
+  if (!heroMount || !moreMount) return;
+  const heroId = isAiPage ? "cardAi" : "cardTrackers";
+  const hero = document.getElementById(heroId);
+  if (hero) {
+    heroMount.appendChild(hero);
+    setCardOpen(hero, true);
+  }
+  for (const id of CARD_ORDER) {
+    if (id === heroId) continue;
+    const card = document.getElementById(id);
+    if (!card) continue;
+    moreMount.appendChild(card);
+    setCardOpen(card, false);
+  }
+}
 
 // ── 设置面板 ──────────────────────────────────────────────────────────────────
 function initSettingsPanel() {
@@ -646,6 +687,12 @@ function render({
   } else {
     renderModuleDisabled("Ai");
   }
+
+  // 上下文聚焦：AI 回答页前置引用透镜，普通页前置追踪器，其余收进「更多」
+  const isAiPage =
+    !!aiSearchSources ||
+    (typeof matchAIWebsite === "function" && !!matchAIWebsite(url));
+  arrangeCards(isAiPage);
 }
 
 // ── 模块已禁用时的卡片状态 ────────────────────────────────────────────────────
@@ -897,15 +944,63 @@ function renderAiSearchSources(aiSearchSources) {
       ok: t.aiSourceTier_ok || "OK",
     })[tier] || tier;
 
+  const catLabel = (cat) => (t.aiSourceCat && t.aiSourceCat[cat]) || cat;
+  const CAT_ICON = { official: "🏛", news: "📰", ugc: "💬", lowtrust: "🔴", other: "🔗" };
+  const CAT_ORDER = ["official", "news", "ugc", "lowtrust", "other"];
+
+  // 与页面内体检口径一致：按 category 统计构成
+  const comp = { official: 0, news: 0, ugc: 0, lowtrust: 0, other: 0 };
+  sources.forEach((s) => {
+    const c = comp[s.category] != null ? s.category : "other";
+    comp[c]++;
+  });
+  const compTotal = sources.length;
+
+  // 与页面内体检口径一致的大白话可信度结论 + 行动建议
+  const V = t.aiVerdict || {};
+  const VA = t.aiVerdictAction || {};
+  const verdict = (() => {
+    if (comp.lowtrust > 0)
+      return { level: "warn", text: typeof V.lowTrust === "function" ? V.lowTrust(comp.lowtrust) : "", action: VA.lowTrust };
+    if (compTotal >= 3 && comp.official + comp.news === 0)
+      return { level: "warn", text: V.noAuthority, action: VA.noAuthority };
+    if (compTotal >= 2 && comp.ugc / compTotal >= 0.5)
+      return { level: "warn", text: V.ugcHeavy, action: VA.ugcHeavy };
+    if (compTotal === 1) return { level: "info", text: V.singleSource, action: VA.singleSource };
+    if (comp.official + comp.news > 0) return { level: "ok", text: V.hasAuthority, action: VA.hasAuthority };
+    return { level: "info", text: V.balanced, action: "" };
+  })();
+  if (verdict.text) {
+    const vIcon = verdict.level === "warn" ? "⚠" : verdict.level === "ok" ? "✓" : "ℹ";
+    const vRow = document.createElement("div");
+    vRow.className = "ai-sources-verdict v-" + verdict.level;
+    vRow.innerHTML =
+      `<div class="ai-verdict-text">${vIcon} ${esc(verdict.text)}</div>` +
+      (verdict.action ? `<div class="ai-verdict-action">${esc(verdict.action)}</div>` : "");
+    wrap.appendChild(vRow);
+  }
+
+  const compParts = CAT_ORDER.filter((c) => comp[c] > 0).map(
+    (c) => `${CAT_ICON[c]} ${esc(catLabel(c))} ${comp[c]}`
+  );
+  if (compParts.length) {
+    const compRow = document.createElement("div");
+    compRow.className = "ai-sources-composition";
+    compRow.innerHTML = compParts.map((p) => `<span>${p}</span>`).join("");
+    wrap.appendChild(compRow);
+  }
+
   sources.forEach((s, i) => {
     const row = document.createElement("div");
     row.className = "ai-source-row tier-" + s.tier;
     row.style.animationDelay = `${i * 35}ms`;
     const reasonStr = (s.reasons || []).map(formatAiSourceReason).filter(Boolean).join(" · ");
+    const cat = comp[s.category] != null && s.category ? s.category : "other";
     row.innerHTML = `
       <div class="ai-source-main">
         <span class="ai-source-tier">${esc(tierLabel(s.tier))}</span>
         <span class="ai-source-host">${esc(s.hostname)}</span>
+        <span class="ai-source-cat">${CAT_ICON[cat]} ${esc(catLabel(cat))}</span>
       </div>
       ${reasonStr ? `<div class="ai-source-reasons">${esc(reasonStr)}</div>` : ""}
     `;

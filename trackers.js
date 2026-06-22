@@ -498,7 +498,9 @@ const AI_WEBSITES_DB = {
   "chat.deepseek.com":      { company: "DeepSeek",          model: "DeepSeek-V3 / R1", risk: "high" },
   "yiyan.baidu.com":        { company: "Baidu",             model: "文心一言 ERNIE",   risk: "high" },
   "tongyi.aliyun.com":      { company: "Alibaba Cloud",     model: "通义千问 Qwen",    risk: "high" },
+  "tongyi.com":             { company: "Alibaba Cloud",     model: "通义千问 Qwen",    risk: "high" },
   "hunyuan.tencent.com":    { company: "Tencent",           model: "混元",             risk: "high" },
+  "yuanbao.tencent.com":    { company: "Tencent",           model: "腾讯元宝",          risk: "high" },
   "doubao.com":             { company: "ByteDance",         model: "豆包",             risk: "high" },
   "chatglm.cn":             { company: "Zhipu AI (智谱AI)", model: "ChatGLM",          risk: "high" },
   "bigmodel.cn":            { company: "Zhipu AI (智谱AI)", model: "GLM 系列",         risk: "high" },
@@ -609,12 +611,17 @@ const AI_BRAND_WHITELIST = [
   {
     brand: "通义千问（阿里云）",
     keywords: ["tongyi", "qianwen"],
-    legit: ["tongyi.aliyun.com", "dashscope.aliyuncs.com"],
+    legit: ["tongyi.aliyun.com", "tongyi.com", "dashscope.aliyuncs.com"],
   },
   {
     brand: "混元（腾讯）",
     keywords: ["hunyuan"],
     legit: ["hunyuan.tencent.com"],
+  },
+  {
+    brand: "腾讯元宝",
+    keywords: ["yuanbao"],
+    legit: ["yuanbao.tencent.com"],
   },
   {
     brand: "豆包（字节跳动）",
