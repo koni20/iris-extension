@@ -377,6 +377,46 @@ function pollData() {
 // ── 启动：先加载设置，再初始化面板和数据 ─────────────────────────────────────
 initSettingsPanel();
 initHistoryPanel();
+initRateBanner();
+
+// ── 评分入口：低频出现、可永久关闭、纯本地（不发任何请求、不收集数据）──────────
+function initRateBanner() {
+  const banner = document.getElementById("rateBanner");
+  if (!banner || !(typeof chrome !== "undefined" && chrome.storage?.local)) return;
+  const OPENS_MIN = 5;          // 至少打开 popup 5 次
+  const DAYS_MIN = 3;           // 且距首次使用 ≥3 天
+  const DAY = 24 * 60 * 60 * 1000;
+
+  chrome.storage.local.get("irisRate", (stored) => {
+    const st = stored.irisRate || {};
+    // 已评分或已永久关闭：不再打扰
+    if (st.status === "rated" || st.status === "dismissed") return;
+
+    const now = Date.now();
+    const next = {
+      firstSeen: st.firstSeen || now,
+      opens: (st.opens || 0) + 1,
+      status: st.status,
+    };
+    chrome.storage.local.set({ irisRate: next });
+
+    const eligible = next.opens >= OPENS_MIN && (now - next.firstSeen) >= DAYS_MIN * DAY;
+    if (!eligible) return;
+
+    const rateText = document.getElementById("rateText");
+    const rateBtn = document.getElementById("rateBtn");
+    const rateDismiss = document.getElementById("rateDismiss");
+    if (rateText) rateText.textContent = t.ratePrompt || "Enjoying Iris? A quick rating really helps.";
+    if (rateBtn) rateBtn.textContent = t.rateAction || "Rate it";
+    if (rateDismiss) rateDismiss.title = t.rateDismiss || "Don't show again";
+
+    const remember = (status) => chrome.storage.local.set({ irisRate: { ...next, status } });
+    if (rateBtn) rateBtn.addEventListener("click", () => { remember("rated"); banner.classList.add("hidden"); });
+    if (rateDismiss) rateDismiss.addEventListener("click", () => { remember("dismissed"); banner.classList.add("hidden"); });
+
+    banner.classList.remove("hidden");
+  });
+}
 
 chrome.storage.local.get("irisSettings", (stored) => {
   if (stored.irisSettings) Object.assign(currentSettings, stored.irisSettings);

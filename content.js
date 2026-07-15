@@ -205,6 +205,24 @@
     '[class*="web-result"]',
   ];
 
+  /** 国产 / 中文 AI 回答页常见引用容器（优先于通用表扫描） */
+  const DOMESTIC_AI_ROOTS = [
+    '[class*="reference" i]',
+    '[class*="citation" i]',
+    '[class*="source-card" i]',
+    '[class*="source_card" i]',
+    '[class*="search-result" i]',
+    '[class*="search_result" i]',
+    '[class*="web-result" i]',
+    '[class*="web_result" i]',
+    '[class*="footnote" i]',
+    '[class*="quote" i]',
+    '[data-testid*="source" i]',
+    '[data-testid*="reference" i]',
+    '[data-testid*="citation" i]',
+    'a[target="_blank"][rel*="noopener"]',
+  ];
+
   /** 通用引用容器允许表（其余站点优先在这些容器内取链接，作用同 Perplexity primary） */
   const CITATION_CONTAINER_ROOTS = [
     '[class*="citation" i]',
@@ -217,7 +235,8 @@
   ];
 
   /** 「参考资料 / 来源 / 链接索引」等引用标题文案 */
-  const CITATION_HEADING_RE = /参考资料|参考来源|参考|来源|引用|链接索引|出处|references?|sources?|citations?/i;
+  const CITATION_HEADING_RE =
+    /参考资料|参考来源|参考链接|网页来源|信息来源|参考|来源|引用|链接索引|出处|引文|references?|sources?|citations?/i;
 
   /** 兜底全页扫描时要排除的非引用区域（导航/页眉页脚/侧栏/相关推荐等） */
   const EXCLUDE_REGION_SELECTOR =
@@ -305,23 +324,25 @@
   function collectFromCitationHeadings(pageRoot, seen, out, max) {
     let nodes;
     try {
-      nodes = document.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,[class*="title" i]');
+      nodes = document.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,span,div[class*="title" i]');
     } catch {
       return;
     }
     nodes.forEach((n) => {
       if (out.length >= max) return;
-      const txt = (n.textContent || "").trim();
-      if (!txt || txt.length > 16 || !CITATION_HEADING_RE.test(txt)) return;
-      const container = n.parentElement || n.nextElementSibling;
-      if (!container) return;
-      container.querySelectorAll('a[href^="http"], a[href^="//"]').forEach((a) => {
-        if (seen.has(a)) return;
-        const host = anchorHost(pageRoot, a);
-        if (!host) return;
-        seen.add(a);
-        out.push({ anchor: a, host });
-      });
+      const raw = (n.textContent || "").trim();
+      const txt = raw.replace(/\s*[（(]\d+[）)]\s*$/, "").trim();
+      if (!txt || txt.length > 28 || !CITATION_HEADING_RE.test(txt)) return;
+      const scopes = new Set();
+      scopes.add(n.parentElement);
+      scopes.add(n.nextElementSibling);
+      let p = n.parentElement;
+      for (let d = 0; p && d < 3; d++) {
+        scopes.add(p);
+        if (p.nextElementSibling) scopes.add(p.nextElementSibling);
+        p = p.parentElement;
+      }
+      collectLinksInScopes(scopes, pageRoot, seen, out, max);
     });
   }
 
@@ -373,6 +394,33 @@
     );
   }
 
+  function isDomesticCitationHost(h) {
+    return (
+      h === "deepseek.com" || h.endsWith(".deepseek.com") ||
+      h === "doubao.com" || h.endsWith(".doubao.com") ||
+      h === "tongyi.com" || h.endsWith(".tongyi.com") ||
+      h === "tongyi.aliyun.com" || h.endsWith(".tongyi.aliyun.com") ||
+      h === "yuanbao.tencent.com" || h.endsWith(".yuanbao.tencent.com") ||
+      h === "kimi.com" || h.endsWith(".kimi.com") ||
+      h === "kimi.moonshot.cn" || h.endsWith(".kimi.moonshot.cn")
+    );
+  }
+
+  function collectLinksInScopes(scopes, pageRoot, seen, out, max) {
+    for (const scope of scopes) {
+      if (!scope || out.length >= max) continue;
+      try {
+        scope.querySelectorAll('a[href^="http"], a[href^="//"]').forEach((a) => {
+          if (seen.has(a)) return;
+          const host = anchorHost(pageRoot, a);
+          if (!host) return;
+          seen.add(a);
+          out.push({ anchor: a, host });
+        });
+      } catch { /* ignore */ }
+    }
+  }
+
   function collectCitationAnchors() {
     const pageRoot = pageRootHost();
     const max = 120;
@@ -386,6 +434,12 @@
     if (isChatGPTHost(pageRoot)) {
       collectAnchorsUnderRoots(CHATGPT_ASSISTANT_ROOTS, pageRoot, seen, out, max);
       collectAnchorsUnderRoots(CHATGPT_SEARCH_ROOTS, pageRoot, seen, out, max);
+      return out.length ? out.slice(0, max) : collectAnchorsFallback(pageRoot, max);
+    }
+    if (isDomesticCitationHost(pageRoot)) {
+      collectAnchorsUnderRoots(DOMESTIC_AI_ROOTS, pageRoot, seen, out, max);
+      if (out.length === 0) collectFromCitationHeadings(pageRoot, seen, out, max);
+      if (out.length === 0) collectAnchorsUnderRoots(CITATION_CONTAINER_ROOTS, pageRoot, seen, out, max);
       return out.length ? out.slice(0, max) : collectAnchorsFallback(pageRoot, max);
     }
     // 其余站点：引用容器允许表 → 引用标题就近容器 → 过滤版全页（空再退原始全页）
@@ -416,6 +470,9 @@
       installCta: "Add Iris",
       shareBtn: "Share",
       copied: "Copied to clipboard",
+      copiedShare: "Copied — share with friends",
+      shareHook: "AI answers aren't always true",
+      shareRateHint: "Like it? Leave a quick rating",
       shareBy: "Checked by Iris — get it: ",
       shareTotal: (n) => `${n} sources checked`,
       verdict: {
@@ -455,6 +512,9 @@
       installCta: "安装 Iris",
       shareBtn: "分享",
       copied: "已复制到剪贴板",
+      copiedShare: "已复制，可转发给亲友",
+      shareHook: "AI 答案不一定是真的",
+      shareRateHint: "觉得有用？欢迎给 Iris 评分",
       shareBy: "由 Iris 检测，安装：",
       shareTotal: (n) => `已检查 ${n} 个来源`,
       verdict: {
@@ -494,6 +554,9 @@
       installCta: "Iris を追加",
       shareBtn: "共有",
       copied: "クリップボードにコピーしました",
+      copiedShare: "コピーしました。共有できます",
+      shareHook: "AIの回答は常に正しいとは限らない",
+      shareRateHint: "役に立ったら評価をお願いします",
       shareBy: "Iris で診断 — 入手：",
       shareTotal: (n) => `${n} 件のソースを確認`,
       verdict: {
@@ -591,6 +654,7 @@
       .map((c) => `${CAT_ICON[c]} ${L.cat[c]} ${comp[c]}`)
       .join(" · ");
     const lines = [
+      L.shareHook,
       `${L.title} · ${host}`,
       `${vIcon} ${verdict.text}${verdict.action ? `（${verdict.action}）` : ""}`,
     ];
@@ -635,7 +699,8 @@
     toast.textContent = msg;
     toast.classList.add("show");
     clearTimeout(showPanelToast._t);
-    showPanelToast._t = setTimeout(() => toast.classList.remove("show"), 1600);
+    const ms = String(msg).length > 28 ? 2400 : 1600;
+    showPanelToast._t = setTimeout(() => toast.classList.remove("show"), ms);
   }
 
   function insertBadge(anchor, host, score) {
@@ -875,7 +940,10 @@
       if (share) share.onclick = (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        copyToClipboard(buildShareText(verdict, comp), () => showPanelToast(L.copied));
+        copyToClipboard(buildShareText(verdict, comp), () => {
+          const hint = L.shareRateHint ? ` · ${L.shareRateHint}` : "";
+          showPanelToast((L.copiedShare || L.copied) + hint);
+        });
       };
     } else {
       const bar = panelRoot.querySelector("#irisBar");

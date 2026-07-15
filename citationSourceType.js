@@ -29,7 +29,10 @@ const CITATION_SOURCE_TYPE_DB = {};
         "chinanews.com", "chinanews.com.cn", "ce.cn", "gmw.cn", "youth.cn",
         "36kr.com", "huxiu.com", "nbd.com.cn", "cb.com.cn",
         "cnstock.com", "cs.com.cn", "bjnews.com.cn", "southcn.com",
-        "ynet.com", "jfdaily.com",
+        "ynet.com", "jfdaily.com", "sina.com.cn", "sohu.com", "163.com",
+        "hexun.com", "eastmoney.com", "stcn.com", "infzm.com", "tmtpost.com",
+        "china.com", "china.com.cn", "cqnews.net", "chinatimes.com",
+        "takungpao.com", "mingpao.com", "hk01.com",
         // 其他亚洲 / 英文媒体
         "scmp.com", "straitstimes.com", "channelnewsasia.com", "bernama.com",
         "japantimes.co.jp", "thehindu.com", "timesofindia.indiatimes.com",
@@ -57,6 +60,7 @@ const CITATION_SOURCE_TYPE_DB = {};
         "weibo.com", "xiaohongshu.com", "jianshu.com", "csdn.net",
         "segmentfault.com", "cnblogs.com", "juejin.cn", "oschina.net",
         "bilibili.com", "tianya.cn", "hupu.com", "ruliweb.com",
+        "baijiahao.baidu.com", "mp.weixin.qq.com", "toutiao.com",
         // 日文
         "note.com", "hatena.ne.jp", "ameblo.jp", "5ch.net",
         "qiita.com", "togetter.com",
@@ -76,6 +80,7 @@ const CITATION_SOURCE_TYPE_DB = {};
         "doi.org", "plos.org", "cell.com", "bmj.com",
         "thelancet.com", "nejm.org", "mayoclinic.org",
         "cdc.gov", "nih.gov", "fda.gov", "nasa.gov",
+        "gov.cn", "edu.cn", "ac.cn",
       ],
     },
   ];
